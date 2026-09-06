@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" href="data:," />
+<title>AI TFLOPS per Dollar — RTX 20 + 30 Series | GPU Flops per Dollar</title>
+<meta name="description" content="Expected INT4 AI performance per used dollar for NVIDIA RTX 20 and 30 series. TPU specs × SecondHandSilicon eBay prices." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <p class="kicker">GPU FLOPS PER DOLLAR &middot; METHODOLOGY TEST</p>
+    <h1>AI compute per dollar <span class="grad" id="coverageName">RTX 20 + 30 series</span></h1>
+    <p class="sub">Expected <strong>INT4</strong> tensor performance (FP4 N/A on Ampere) &divide; trailing-30-day used price.
+      Specs: <a href="https://www.techpowerup.com/gpu-specs">TechPowerUp GPU DB</a> &middot;
+      Prices: <a href="https://secondhandsilicon.com/">SecondHandSilicon</a> (eBay sold, used).</p>
+    <div class="hero-stats" id="heroStats"></div>
+    <div class="controls">
+      <label>Sort
+        <select id="sortSel">
+          <option value="tflops_per_dollar">AI TFLOPS / $ (dense)</option>
+          <option value="tflops_per_dollar_sparse">AI TFLOPS / $ (sparse)</option>
+          <option value="ai_tflops">AI TFLOPS (INT4)</option>
+          <option value="price_usd">Used price (low first)</option>
+          <option value="memory_gb">VRAM (high first)</option>
+          <option value="bandwidth_gbs">Bandwidth (high first)</option>
+          <option value="tdp_w">TDP (low first)</option>
+        </select>
+      </label>
+      <label class="search">Filter <input id="q" type="search" placeholder="e.g. 3080, 24GB…" /></label>
+      <label class="check"><input type="checkbox" id="sparseToggle" /> Show sparse (2:4) numbers</label>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Leaderboard</h2>
+    <p class="hint">Bar = dense INT4 TFLOPS per dollar. Toggle sparse to double every bar (structured sparsity).</p>
+    <div id="board"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Compare all specs</h2>
+    <div class="table-wrap"><table id="tbl">
+      <thead><tr>
+        <th data-k="short_name">GPU</th>
+        <th data-k="ai_tflops" class="num">INT4 TFLOPS</th>
+        <th data-k="price_usd" class="num">Used $ (30d)</th>
+        <th data-k="tflops_per_dollar" class="num">TFLOPS/$</th>
+        <th data-k="memory_gb" class="num">VRAM</th>
+        <th data-k="bandwidth_gbs" class="num">BW GB/s</th>
+        <th data-k="tdp_w" class="num">TDP</th>
+        <th data-k="bus_interface">Bus</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <h2>GPU detail cards</h2>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="panel two-col">
+    <div>
+      <h2>Methodology</h2>
+      <ol class="method">
+        <li><strong>AI TFLOPS</strong> = dense max(FP4, INT4) from TPU <em>Matrix Performance</em>. Ampere has no FP4 hardware, so dense INT4 is used; sparse 2:4 (2&times;) plus INT8/FP16/BF16/TF32 tensor and FP32/FP16 theoretical are shown alongside. Where Matrix numbers are absent, the highest <em>Theoretical Performance</em> number is used.</li>
+        <li><strong>Price</strong> = SecondHandSilicon trailing-30-day mean of <em>used</em> eBay sold listings (API stat + independent recompute from raw listings in each JSON). Samples below 10 listings are flagged <span class="badge thin">thin</span>.</li>
+        <li><strong>Metric</strong> = AI TFLOPS &divide; price. Also stored: VRAM/$, bandwidth/$, W/TFLOP, sparse variant.</li>
+      </ol>
+    </div>
+    <div>
+      <h2>Caveats &amp; provenance</h2>
+      <ul class="method">
+        <li>TPU specs are <strong>fully live</strong>: fetched with headed Chromium (<code>playwright-cli</code> solves the PoW; headless gets a hard 403). Raw pages archived as zstd blobs in <code>gpu.db:raw_pages</code>; each run diffs live values against the curated baseline (<code>tpu_discrepancies</code>, currently empty after fixing 13 real errors: PSU ratings, GA106 12.0B transistors, RTX 3050's 32 ROPs / PCIe x8 / 8-pin, 3080 die stepping).</li>
+        <li>RTX 3060 8GB has <strong>no TPU reference page</strong> (verified in the live DB table — AIB-only launch); its record is sibling-derived, memory per TPU news 300248.</li>
+        <li>3090/3090 Ti carry a large VRAM premium (24 GB) &mdash; worst TFLOPS/$ but best for large local models.</li>
+        <li>SHS 30-day means move daily; every record is timestamped (<code>pricing.fetched_at</code>).</li>
+      </ul>
+      <p class="downloads">Raw data (live from the database):
+        <a href="../api/gpus">gpus.json</a> &middot;
+        <a href="../api/bundle">bundle.json</a> &middot;
+        <a href="../gpu.db" download>gpu.db (SQLite + zstd)</a> &middot;
+        <span id="genAt"></span></p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built from <code>gpu.db</code> &middot; refresh with <code>python3 -m scraper.run --tpu-live-dir &lt;dir&gt;</code> &middot;
+  serve locally with <code>python3 tools/serve.py</code> &rarr; <a href="http://localhost:8000/website/">localhost:8000/website/</a></p>
+</footer>
+
+<script src="dbloader.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
