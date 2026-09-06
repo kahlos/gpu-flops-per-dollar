@@ -55,7 +55,9 @@ def load_live(tpu_dir: Path | None, meta: dict, con=None, refresh: bool = False)
                     dt.datetime.now(dt.timezone.utc).isoformat())
         except Exception as e:
             print(f"  [tpu] {gid}: {e!r} -> curated")
-    return None, ("sibling" if gid == "rtx-3060-8gb" else "curated"), None, None
+    # No TPU source at all: sibling-derived when no reference page exists
+    # (tpu_url None by policy), curated fallback otherwise.
+    return None, ("sibling" if meta.get("tpu_url") is None else "curated"), None, None
 
 
 def flag(n: int | None) -> str:
@@ -94,6 +96,10 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
             ("theoretical_fp16_tflops", "fp16_theoretical_tflops"),
             ("theoretical_fp64_gflops", "fp64_gflops"),
             ("matrix_fp16_tflops", "matrix_fp16_dense"),
+            ("matrix_bf16_tflops", "matrix_bf16_dense"),
+            ("matrix_tf32_tflops", "matrix_tf32_dense"),
+            ("matrix_fp8_tflops", "matrix_fp8_dense"),
+            ("matrix_fp4_tflops", "matrix_fp4_dense"),
             ("matrix_int8_tops", "matrix_int8_dense"),
             ("matrix_int4_tops", "matrix_int4_dense"),
         ]
@@ -154,12 +160,16 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
             "f64": float(LV("theoretical_fp64_gflops", cur["fp64_gflops"])),
             "px": float((live.get("pixel_rate_gpixels") if live else None) or 0) or None,
             "tx": float((live.get("texture_rate_gtexels") if live else None) or 0) or None}
-    mx = {"fp4": None, "fp8": None,
-          "i4": float(LV("matrix_int4_tops", cur["matrix_int4_dense"])),
-          "i8": float(LV("matrix_int8_tops", cur["matrix_int8_dense"])),
-          "f16": float(LV("matrix_fp16_tflops", cur["matrix_fp16_dense"])),
-          "bf": float(live["matrix_bf16_tflops"]) if live and live.get("matrix_bf16_tflops") else None,
-          "tf": float(live["matrix_tf32_tflops"]) if live and live.get("matrix_tf32_tflops") else None,
+    def _F(live_key, cur_key):
+        v = LV(live_key, cur.get(cur_key))
+        return float(v) if v is not None else None
+    mx = {"fp4": _F("matrix_fp4_tflops", "matrix_fp4_dense"),
+          "fp8": _F("matrix_fp8_tflops", "matrix_fp8_dense"),
+          "i4": _F("matrix_int4_tops", "matrix_int4_dense"),
+          "i8": _F("matrix_int8_tops", "matrix_int8_dense"),
+          "f16": _F("matrix_fp16_tflops", "matrix_fp16_dense"),
+          "bf": _F("matrix_bf16_tflops", "matrix_bf16_dense"),
+          "tf": _F("matrix_tf32_tflops", "matrix_tf32_dense"),
           # Structured sparsity is Ampere+. Turing pages list no sparse note.
           "sparse_mult": 2.0 if (live and live.get("sparse_note")) or
           (not live and cur["architecture"] not in ("Turing",)) else 1.0}
@@ -171,14 +181,29 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
                 "windows": d["windows"], "monthly": d["monthly"],
                 "stats": d["stats"], "product_meta": d["summary"].get("product", {})}
 
-    ai_t = mx["i4"]
+    # Precision selection (METHODOLOGY.md): dense max(FP4, INT4). Ampere/Turing
+    # have no FP4 so INT4 wins; Blackwell+ has FP4 and no INT4. Tensor-less
+    # cards (no Matrix block) fall back to the highest Theoretical number.
+    _cands = {"FP4 dense": mx["fp4"], "INT4 dense": mx["i4"]}
+    _avail = {k: v for k, v in _cands.items() if v is not None}
+    if _avail:
+        ai_prec, ai_t = max(_avail.items(), key=lambda kv: kv[1])
+    else:
+        _theo_cands = {"Theoretical FP32 (fallback)": theo["f32"],
+                       "Theoretical FP16 (fallback)": theo["f16"],
+                       "Theoretical FP64 (fallback)": (theo["f64"] / 1000.0 if theo["f64"] is not None else None)}
+        _theo_avail = {k: v for k, v in _theo_cands.items() if v is not None}
+        if _theo_avail:
+            ai_prec, ai_t = max(_theo_avail.items(), key=lambda kv: kv[1])
+        else:
+            ai_prec, ai_t = "missing", None
     used_block = cond_block(shs.get("used"))
     new_block = cond_block(shs.get("new"))
     price_u = (used_block or {}).get("canon")
     sm = mx["sparse_mult"] or 1.0
-    ai = {"t": ai_t, "ts": round(ai_t * sm, 2), "prec": "INT4 dense",
-          "pd": round(ai_t / price_u, 4) if price_u else None,
-          "pds": round(ai_t * sm / price_u, 4) if price_u else None}
+    ai = {"t": ai_t, "ts": round(ai_t * sm, 2) if ai_t is not None else None, "prec": ai_prec,
+          "pd": round(ai_t / price_u, 4) if (ai_t and price_u) else None,
+          "pds": round(ai_t * sm / price_u, 4) if (ai_t and price_u) else None}
 
     n30u = (used_block["windows"]["30d"]["n"] if used_block else 0)
     n30n = (new_block["windows"]["30d"]["n"] if new_block else 0)
