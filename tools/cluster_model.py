@@ -37,7 +37,13 @@ AMORT_MO = 36
 CTX, KV_TOK = 2048, 600.0
 ELEC, DUTY = 0.20, 0.90
 MONTH_S = 2.628e6
-API_BLEND = 0.1741
+# verified API comparators (see report section 2): official list vs cheapest
+# same-model host found (Sail Research). Blends use 82% input / 18% output,
+# 95% cache-hit on input for the cached variant.
+API_OFF_UNCACHED = 0.1652
+API_SAIL_UNCACHED = 0.1062
+API_SAIL_CACHED = 0.0517
+API_BLEND = API_OFF_UNCACHED          # default comparator = official uncached
 
 
 def load_gpus(db_path):
@@ -210,22 +216,24 @@ def main():
               % (g["short_name"], g["price"], g["n30d"], g["vram"], g["bw"],
                  g["tops"], g["prec"], e["N"], e["B"], format(int(e["tps"]), ","),
                  e["kw"], format(int(e["capex"]), ","), e["cost"],
-                 API_BLEND / e["cost"]))
+                 API_SAIL_UNCACHED / e["cost"]))
 
     winner = res[0]["g"]
-    lo, hi = 0.0005, 0.9
-    for _ in range(48):
-        mid = (lo + hi) / 2
-        s = simulate(winner, 43, args.ctx, args.kv, args.eff_mem, act)
-        e = econ(winner, s, 43, mid, args.elec)
-        if e and e["cost"] > API_BLEND:
-            lo = mid
-        else:
-            hi = mid
-    print("")
-    print("break-even duty (%s, N=43) vs %.4f API blend: %.2f%% (~%sB tok/mo)"
-          % (winner["short_name"], API_BLEND, hi * 100,
-             format(int(res[0]["tps"] * MONTH_S * hi / 1e9), ",")))
+    for label, target in (("official uncached", API_OFF_UNCACHED),
+                          ("Sail uncached", API_SAIL_UNCACHED),
+                          ("Sail cached (strictest)", API_SAIL_CACHED)):
+        lo, hi = 0.0005, 0.9
+        for _ in range(48):
+            mid = (lo + hi) / 2
+            s = simulate(winner, 43, args.ctx, args.kv, args.eff_mem, act)
+            e = econ(winner, s, 43, mid, args.elec)
+            if e and e["cost"] > target:
+                lo = mid
+            else:
+                hi = mid
+        print("break-even duty (%s, N=43) vs %s ($%.4f): %.2f%% (~%sB tok/mo)"
+              % (winner["short_name"], label, target, hi * 100,
+                 format(int(res[0]["tps"] * MONTH_S * hi / 1e9), ",")))
 
 
 if __name__ == "__main__":

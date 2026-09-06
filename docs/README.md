@@ -61,14 +61,17 @@ query.get_listings(con, 'rtx-3090', 'used')['rows']  # [[date, price, title]]
 - `API.md` — live endpoint reference with curl/Python examples.
 - `ROADMAP.md` — must-dos (FP4 selection before Blackwell!), scale-up plan, open ideas.
 - `CLUSTER-VIABILITY-ANALYSIS.md` — the single consolidated research document:
-  DeepSeek V4 Flash 0731 model spec, the used-GPU cluster economics vs the API
-  pricing benchmark, and the research history with a 14-entry error ledger.
-  Verdict: PP43 + W4A4 + FP8 activations on 43x RTX 3080 10GB = 252K tok/s at
-  ~$0.006/1M all-in vs $0.1741 API blend (~30x); break-even at ~2% duty.
-  Reproduce with `tools/cluster_model.py` (the .py is the authority). Three
-  earlier research reports were merged into it and retired — originals in git
-  history (commit 3e98f0c); do not resurrect their economics without reading
-  the error ledger (section 11) first.
+  DeepSeek V4 Flash 0731 model spec (verified against the official release),
+  the used-GPU cluster economics vs verified API pricing, and the research
+  history with a 15-entry error ledger. Verdict: PP43 + W4A4 + FP8 activations
+  on 43x RTX 3080 10GB = 252K tok/s at ~$0.006/1M all-in — 28x under official
+  uncached list pricing, 18x under Sail Research's cached-uncached spread, and
+  8.8x under the strictest same-model cached blend; break-even 2-7% duty
+  depending on workload cache profile. Reproduce with
+  `tools/cluster_model.py` (the .py is the authority). Three earlier research
+  reports were merged into it and retired — originals in git history (commit
+  3e98f0c); do not resurrect their economics without reading the error ledger
+  (section 11) first.
 
 ## Sources
 

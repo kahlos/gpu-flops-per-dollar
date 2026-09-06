@@ -4,10 +4,11 @@
 older GPUs be built and run cost-competitively against the public API pricing
 of DeepSeek V4 Flash 0731, for bulk batch workloads?
 
-**Verdict: yes — ~30x unit-cost advantage at baseline ($0.0059/1M vs $0.1741
-API blend), 2.4x in the worst defensible corner, break-even at ~2%
-utilization (~14B tokens/month).** The binding risks are serving software
-and demand, not physics or electricity.
+**Verdict: yes — unit costs of $0.0059/1M beat every verified comparator by
+9-28x at baseline (28x vs official uncached list pricing; 8.8x vs the
+cheapest same-model host found), with break-even at 2-7% utilization
+(~14-47B tokens/month) depending on workload and provider.** The binding
+risks are serving software and demand, not physics or electricity.
 
 **Document status.** This merges and supersedes three earlier research
 reports (INT4 viability, token economics, legacy TCO analysis) which were
@@ -104,23 +105,32 @@ under the 14.7 ms cycle (34% link utilization). FP16 activations (30.4 MB,
 10.1 ms, 69%) overflow the link once prefill traffic joins — FP8 activations
 are mandatory, not optional. See section 8.
 
-## 2. API benchmark (the competitor)
+## 2. API benchmark (the competitors)
 
-DeepSeek V4 Flash 0731 public API rates, per the project pricing baseline:
+The model ships MIT open weights, so the right comparator is **cheapest
+credible access to the same model**, not list price alone. Verified rates
+(USD / 1M tokens):
 
-| Token type | Rate |
-|---|---|
-| Standard input | $0.11 / 1M |
-| Output | $0.66 / 1M |
-| Prompt-cached input | $0.007 / 1M |
+| Provider | Input (miss) | Input (cached) | Output | Uncached blend (82% in) | 95%-cached blend (82% in) | Verification |
+|---|---|---|---|---|---|---|
+| Official DeepSeek API | $0.14 | $0.0028 | $0.28 | $0.1652 | $0.0583 | multiple independent price trackers converge; official page is JS-rendered — recheck before committing capital |
+| Sail Research (same model, ASAP window) | $0.09 | $0.02 | $0.18 | $0.1062 | $0.0517 | verified from docs.sailresearch.com/pricing (their pricing.md) |
+| *Project docs (retired benchmark)* | *$0.11* | *$0.007* | *$0.66* | *$0.2090* | *$0.1288* | *unverified — output overstated 2.4x; see section 11, ledger #15* |
 
-Blended comparators: **$0.2088/1M** (uncached standard workload, ~82% input
-share) and **$0.1741/1M** (95% prompt-cached workload). Both are conservative:
-for output-heavy tasks the API charges far above the blend, and the local
-cluster cost is roughly token-type-independent. Earlier iterations quoted the
-two blends with different implicit token mixes (the $0.1741 is not derivable
-from the same mix that yields $0.2088) — derive any blend as rates x explicit
-mix, and state the mix.
+Blends use the standard bulk workload mix: 82% input / 18% output, with 95%
+of input tokens cache-hit in the cached column. Official DeepSeek also bills
+peak/off-peak variants that trackers report inconsistently — treat the table
+as the consensus view and re-verify at decision time.
+
+**Why Sail is the load-bearing comparator:** it serves the identical open
+checkpoint at $0.18 output — 3.5x cheaper than official — precisely because
+running open weights on owned hardware (what Sail does at scale, what this
+cluster would do) is the low-cost serving model. Comparing the cluster
+against official list prices alone would flatter it.
+
+Cheaper-but-smaller models on Sail (gpt-oss-120b, Gemma 4 31B, Qwen3.6 35B at
+$0.05-0.14 input) blend to $0.09-0.12/1M uncached — still 15-19x the cluster,
+but they are not quality-comparable to V4 Flash 0731 (82.7 Terminal Bench 2.1).
 
 ## 3. Method
 
@@ -185,7 +195,7 @@ large as KV capacity allows, FP8 activations.** Three reasons, each verified:
 | CapEx | **$33,755** ($38,818 w/ 15% contingency + spares) | DB price $370/GPU (1,565 listings/30d — deep market) |
 | Output @ 90% duty | 597 B tokens/month | — |
 | **All-in cost** | **$0.0059/1M** | fixed $1.88K/mo + power $1.55K/mo |
-| **Margin vs API blend** | **30x** | 29x at 50% roofline software |
+| **Margin vs comparators** | **28x official uncached / 8.8x Sail** | 9.9x / 3.2x at roofline-50% software |
 
 Prefill compute fits alongside decode: decode 7.2 PF/s + prefill 1.6 PF/s
 (P=1K, G=4K) = 72% of the 12.3 PF/s INT4 budget. Dense-GQA KV (no CSA/HCA,
@@ -197,15 +207,17 @@ the compressed-attention assumption.
 All numbers tool-verified ("tools/cluster_model.py --gpu <id>"; per-card
 INT4/FP4 TOPS, FP8 activations):
 
-| Config | B | tok/s | CapEx | $/1M | vs API | Note |
+| Config | B | tok/s | CapEx | $/1M | vs Sail uncached | Note |
 |---|---|---|---|---|---|---|
-| **43x RTX 3080 10GB** | 3,715 | 252,207 | $38.8K | **$0.0059** | 30x | flagship: deepest market (1,565 listings/30d) |
-| 43x RTX 3080 12GB | 5,212 | 345,234 | $42.2K | $0.0046 | 38x | best $/1M; thin market (31 listings/30d) |
-| 43x RTX 3090 24GB | 14,197 | 454,687 | $84.5K | $0.0046 | 37x | most KV headroom, same cost class |
-| 16x RTX 3090 (4 hosts, L_s=3) | 2,869 | 91,886 | $31.4K | $0.0109 | 16x | simplest ops — recommended pilot |
-| 43x RTX 2080 Ti | 4,464 | 220,203 | $35.5K | $0.0060 | 29x | Turing W4A4 kernel risk |
-| 43x RX 9070 XT | 8,207 | 279,509 | $70.1K | $0.0066 | 26x | ROCm PP/batching risk |
-| 43x RTX 5090 | 20,186 | 697,544 (xfer-bound) | $266.6K | $0.0069 | 25x | highest absolute output; CapEx-heavy |
+| **43x RTX 3080 10GB** | 3,715 | 252,207 | $38.8K | **$0.0059** | 18x | flagship: deepest market (1,565 listings/30d) |
+| 43x RTX 3080 12GB | 5,212 | 345,234 | $42.2K | $0.0046 | 23x | best $/1M; thin market (31 listings/30d) |
+| 43x RTX 3090 24GB | 14,197 | 454,687 | $84.5K | $0.0046 | 23x | most KV headroom, same cost class |
+| 16x RTX 3090 (4 hosts, L_s=3) | 2,869 | 91,886 | $31.4K | $0.0109 | 10x | simplest ops — recommended pilot |
+| 43x RTX 2080 Ti | 4,464 | 220,203 | $35.5K | $0.0060 | 18x | Turing W4A4 kernel risk |
+| 43x RX 9070 XT | 8,207 | 279,509 | $70.1K | $0.0066 | 16x | ROCm PP/batching risk |
+| 43x RTX 5090 | 20,186 | 697,544 (xfer-bound) | $266.6K | $0.0069 | 15x | highest absolute output; CapEx-heavy |
+
+(vs official DeepSeek uncached list pricing: 28x / 36x / 36x / 15x / 27x / 25x / 24x)
 
 **Key insight:** the project ai_pd (TFLOPS/$) metric is the wrong lens for
 cluster serving. The economics are driven by **bandwidth x VRAM per dollar** —
@@ -213,18 +225,25 @@ which is why $370-440 mid-range Ampere beats a $4,977 5090 on cost per token.
 
 ## 7. Sensitivity (the conclusion is robust)
 
-| Scenario | $/1M | Margin |
-|---|---|---|
-| Baseline (90% duty, $0.20/kWh, roofline) | $0.0059 | 30x |
-| Software achieves 50% of roofline | $0.0118 | 15x |
-| Software achieves 25% of roofline | $0.0235 | 7x |
-| Utilization 50% / 25% / 10% / 5% | $0.0091 / 0.0162 / 0.0376 / 0.0732 | 19x / 11x / 4.6x / 2.4x |
-| Electricity $0.08 / $0.30 per kWh | $0.0043 / $0.0072 | 40x / 24x |
-| Pessimistic memory efficiency (eff 0.5) | $0.0088 | 20x |
-| KV uncompressed GQA-4 (2 KB/token/layer) | ~2x the base cost | still > 10x |
-| **Worst sane corner** (25% roofline + 25% duty + $0.30/kWh) | **$0.0734** | **2.4x** |
-| **Break-even utilization** vs $0.1741 blend | **2.07% duty = ~14B tok/mo** | — |
-| Break-even vs $0.11 input-only floor | 3.30% duty = ~22B tok/mo | — |
+Margins are against the two verified comparators: official uncached blend
+($0.1652) and the cheapest same-model cached blend (Sail, $0.0517). "Cached"
+refers to a 95% cache-hit input workload — the least favorable case for the
+cluster, since cached input is where APIs are cheapest.
+
+| Scenario | $/1M | vs official uncached | vs Sail cached (strictest) |
+|---|---|---|---|
+| Baseline (90% duty, $0.20/kWh, roofline) | $0.0059 | 28x | 8.8x |
+| Software achieves 50% of roofline | $0.0118 | 14x | 4.4x |
+| Software achieves 25% of roofline | $0.0235 | 7x | 2.2x |
+| Utilization 50% / 25% / 10% | $0.0091 / 0.0162 / 0.0376 | 18x / 10x / 4.4x | 5.7x / 3.2x / 1.4x |
+| Electricity $0.08 / $0.30 per kWh | $0.0043 / $0.0072 | 38x / 23x | 12x / 7.2x |
+| Pessimistic memory efficiency (eff 0.5) | $0.0088 | 19x | 5.9x |
+| KV uncompressed GQA-4 (2 KB/token/layer) | ~2x the base cost | ~14x | ~4.4x |
+| **Worst sane corner** (25% roofline + 25% duty + $0.30/kWh) | **$0.0734** | **2.3x** | **0.7x — does not clear** |
+| **Break-even utilization** (flagship), official cached blend ($0.0583) | — | **6.3% duty = ~42B tok/mo** | — |
+| **Break-even utilization** (flagship), Sail cached blend ($0.0517) | — | — | **7.2% duty = ~47B tok/mo** |
+| **Break-even utilization** (flagship), official uncached ($0.1652) | — | **2.2% duty = ~14B tok/mo** | — |
+| **Break-even utilization** (flagship), Sail uncached ($0.1062) | — | — | **3.4% duty = ~23B tok/mo** |
 
 Per-task vs API (flagship, all-in): extraction (2K-in/200-out) **12x** cheaper
 cached-benchmark, 27x uncached; transform (2K/2K) **57x/65x**; generation
@@ -245,8 +264,10 @@ $0.66/1M for what costs $0.006 locally.
 4. **KV capacity is the batch limiter.** Compressed attention (MLA-class
    600 B/token/layer) is what allows B ~ 3,715; uncompressed GQA halves it.
 5. **Demand is the true constraint.** Full output is 597 B tokens/month —
-   a DeepSeek-scale book of business. Break-even sits at ~2% duty; every
-   scenario above 5% duty is profitable under the API benchmark.
+   a DeepSeek-scale book of business. Break-even is 2-3% duty for
+   uncached-heavy demand, 6-7% for cached-heavy demand (APIs discount cached
+   input hardest); above ~7% duty the cluster is profitable under every
+   verified comparator.
 
 ## 9. Future upgrades (model + software only)
 
@@ -262,8 +283,10 @@ $0.66/1M for what costs $0.006 locally.
   fills).
 - **Smaller active-param models** (13B -> 7B class): helps prefill/headroom;
   decode stays KV-bound.
-- Counter-risk: API price deflation. Even a 2x API cut (blend $0.087) leaves
-  the flagship 15x ahead at baseline assumptions.
+- Counter-risk: API price deflation. The 2026 verified floor for same-model
+  access is already ~$0.05/1M cached-blend (Sail); a further 2x cut to ~$0.026
+  would leave the flagship only ~4x ahead at baseline — still viable, but the
+  deflation is real and tracked quarterly.
 
 ## 10. Recommendation: staged plan with kill gates
 
@@ -271,8 +294,9 @@ $0.66/1M for what costs $0.006 locally.
    Gate: sustained >= 50% of modeled 92K tok/s; per-stage achieved BW >= 60%;
    straggler tail <= 10% of cycle time. Cheap kill: 3090 resale market is deep.
 2. **Scale (weeks 9-20): 43x RTX 3080 10GB flagship** once PP16 software is
-   proven and a buyer for >= 15-20B tok/mo is signed. Gate: signed demand
-   >= break-even (14B tok/mo) before ordering the remaining 27 nodes.
+   proven and demand is contracted. Gate: signed demand >= 50B tok/mo (the
+   cached-workload break-even, 7.2% duty) before ordering the remaining 27
+   nodes; uncached-heavy demand can clear at 24B tok/mo.
 3. **Operate:** FP8 activations, continuous batching, hot spares, weekly
    failure audit. Never run crawls and the cluster on the same circuits.
 
@@ -326,7 +350,11 @@ derivation paths, DB-grounded prices/specs, and a derived (not assumed) batch
 size. Result: 252K tok/s and $0.0059/1M for the flagship — between the
 earlier docs two mutually inconsistent numbers (their claimed 2.96M tok/s was
 ~12x too high; their cost basis of ~5.9K tok/s was ~43x too low). Their
-optimized-unit-cost of $0.1403/1M was ~24x too pessimistic.
+optimized-unit-cost of $0.1403/1M was ~24x too pessimistic. In this phase the
+model spec was verified against the official DeepSeek-V4-Flash-0731 release
+(config.json) and the API benchmark was re-grounded in verified pricing
+(section 2) — which cut the headline margin from the originally reported 30x
+against the stale $0.1741 comparator to 9-28x against verified comparators.
 
 ### Error ledger (do not repeat)
 
@@ -346,6 +374,7 @@ optimized-unit-cost of $0.1403/1M was ~24x too pessimistic.
 | 12 | PUE declared, never applied | phase 3 | apply declared overheads or delete them |
 | 13 | Model-storage total inconsistent with own bits/param | phase 1 | 284B x 2.5 bits = 88.8 GB, not 79.5 GB |
 | 14 | Proposed kernels presented as existing software | phase 1 | label proposed vs real; real list in section 1 |
+| 15 | API benchmark rates assumed, never verified ($0.66 output vs $0.28 actual; $0.007 cached vs $0.0028 actual) | phases 2-3 | benchmark = cheapest verified same-model access (open weights => Sail-class hosts), not list price; re-verify at decision time |
 
 ## 12. Model assumptions (locked for this document)
 
