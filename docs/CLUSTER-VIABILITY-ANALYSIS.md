@@ -23,11 +23,17 @@ the .py is the authority if this document and the code ever disagree).
 
 ## 1. Model and workload specification (DeepSeek V4 Flash 0731)
 
-**Status of the model: hypothetical/unannounced.** Every model-side number in
-this section is a *scenario definition* agreed for the study, not a measured
-fact. The hardware side (specs, prices, power) is measured — it comes from
-gpu.db and the crawler provenance chain. Conclusions are robust to the
-model-side sensitivities tested in section 7.
+**Status of the model: real and verified.** DeepSeek-V4-Flash-0731 is an
+official release (MIT license; model card at
+huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731; technical report
+arXiv:2606.19348). The structural parameters below are confirmed against the
+official config.json; the one model-side input that remains *estimated* is
+effective KV bytes/token at serving precision (confirmed compression ratios,
+but stack-dependent — sensitivity-tested in section 7). The hardware side
+(specs, prices, power) is measured via gpu.db and the crawler provenance
+chain. The earlier research docs also invented tooling and mis-stated
+arithmetic — section 11 tracks exactly which of their model claims survived
+verification.
 
 | Parameter | Value | Note |
 |---|---|---|
@@ -38,9 +44,11 @@ model-side sensitivities tested in section 7.
 | d_model / d_ff | 4096 / 2048 | — |
 | MoE FFN share | 278.1B (97.9%) | attention + dense + embeddings ~5.9B |
 | Active params/layer | ~302M | = ~6 routed experts + shared + attention |
-| Attention | hybrid compressed: CSA 4x, HCA 128x | scenario assumption; see KV sanity below |
+| Attention | hybrid compressed: CSA 4x, HCA 128x | verified: config compress_ratios = [0,0,4,128,...] per layer |
 | FLOPs/token (decode) | 28.6 GFLOP | 2 x 13B x 1.10 attention overhead |
 | FLOPs/token/layer | 665 MFLOP | / 43 layers |
+| Context window | 1,048,576 (1M) | verified: max_position_embeddings; bulk-scenario ctx is a request choice |
+| Checkpoint dtype | FP8 weights (e4m3, 128x128 blocks), FP4 experts | verified: config quantization_config / expert_dtype — matches the W4A4-class base case |
 
 **KV cache sanity.** Assumed 600 B/token/layer (FP8 KV, GQA-4 x 128, hybrid
 compression). Real DeepSeek-V3 MLA is 65.6 KB/token total across 61 layers
@@ -248,6 +256,10 @@ $0.66/1M for what costs $0.006 locally.
 - **Kernel maturity**: 0.75 -> 0.85 achieved BW (Marlin-class W4A4 grouped
   GEMM): +13%.
 - **Speculative decoding** at high batch: +30-80% where acceptance holds.
+  Note: this ships built into the official release — the DSpark module
+  (7-token drafts, vLLM/SGLang single-flag) — so treat it as available now;
+  expect the low end of the range at large batch (acceptance falls as batch
+  fills).
 - **Smaller active-param models** (13B -> 7B class): helps prefill/headroom;
   decode stays KV-bound.
 - Counter-risk: API price deflation. Even a 2x API cut (blend $0.087) leaves
