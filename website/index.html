@@ -4,88 +4,142 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="icon" href="data:," />
-<title>AI TFLOPS per Dollar — RTX 20 + 30 Series | GPU Flops per Dollar</title>
-<meta name="description" content="Expected INT4 AI performance per used dollar for NVIDIA RTX 20 and 30 series. TPU specs × SecondHandSilicon eBay prices." />
+<title>GPU Compute per Dollar — filter by precision | GPU Flops per Dollar</title>
+<meta name="description" content="Browse 150+ GPUs by FP4, INT4, INT8, FP8, FP16, BF16, TF32 and FP32 throughput per used dollar. Specs: TechPowerUp. Prices: SecondHandSilicon eBay sold." />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 <header class="hero">
   <div class="hero-inner">
-    <p class="kicker">GPU FLOPS PER DOLLAR &middot; METHODOLOGY TEST</p>
-    <h1>AI compute per dollar <span class="grad" id="coverageName">RTX 20 + 30 series</span></h1>
-    <p class="sub">Expected <strong>INT4</strong> tensor performance (FP4 N/A on Ampere) &divide; trailing-30-day used price.
+    <p class="kicker">GPU FLOPS PER DOLLAR &middot; <span id="gpuCountKick">— GPUs</span> &middot; LIVE FROM gpu.db</p>
+    <h1>Compute per dollar, <span class="grad">by precision</span></h1>
+    <p class="sub">Pick a numeric format — <strong>FP4 ≠ INT4</strong> and they are never mixed here.
+      Each ranking divides that precision's dense tensor throughput by the trailing-30-day eBay price.
       Specs: <a href="https://www.techpowerup.com/gpu-specs">TechPowerUp GPU DB</a> &middot;
-      Prices: <a href="https://secondhandsilicon.com/">SecondHandSilicon</a> (eBay sold, used).</p>
+      Prices: <a href="https://secondhandsilicon.com/">SecondHandSilicon</a> (sold, <span id="condName">used</span>).</p>
     <div class="hero-stats" id="heroStats"></div>
+
+    <div class="prec-block">
+      <div class="prec-label">Compute precision
+        <span class="prec-note" id="precSupport">—</span>
+      </div>
+      <div class="prec-groups" id="precGroups" role="tablist" aria-label="Compute precision"></div>
+      <p class="prec-warn" id="precWarn" hidden></p>
+    </div>
+
     <div class="controls">
-      <label>Sort
-        <select id="sortSel">
-          <option value="tflops_per_dollar">AI TFLOPS / $ (dense)</option>
-          <option value="tflops_per_dollar_sparse">AI TFLOPS / $ (sparse)</option>
-          <option value="ai_tflops">AI TFLOPS (INT4)</option>
-          <option value="price_usd">Used price (low first)</option>
-          <option value="memory_gb">VRAM (high first)</option>
-          <option value="bandwidth_gbs">Bandwidth (high first)</option>
-          <option value="tdp_w">TDP (low first)</option>
-        </select>
-      </label>
-      <label class="search">Filter <input id="q" type="search" placeholder="e.g. 3080, 24GB…" /></label>
-      <label class="check"><input type="checkbox" id="sparseToggle" /> Show sparse (2:4) numbers</label>
+      <div class="ctl-row">
+        <label class="ctl">Price basis
+          <div class="seg" id="condSeg">
+            <button data-cond="used" class="on">Used 30d</button>
+            <button data-cond="new">New 30d</button>
+          </div>
+        </label>
+        <label class="ctl">Throughput
+          <div class="seg" id="sparseSeg">
+            <button data-sp="dense" class="on">Dense</button>
+            <button data-sp="sparse">Sparse 2:4</button>
+          </div>
+        </label>
+        <label class="ctl">View
+          <div class="seg" id="viewSeg">
+            <button data-view="rank" class="on">Rank</button>
+            <button data-view="scatter">Scatter</button>
+            <button data-view="table">Table</button>
+            <button data-view="cards">Cards</button>
+          </div>
+        </label>
+        <label class="ctl grow">Search <input id="q" type="search" placeholder="e.g. 3080, 24GB, GDDR7, Ampere…" autocomplete="off" /></label>
+        <label class="ctl">Sort
+          <select id="sortSel"></select>
+        </label>
+      </div>
+      <div class="ctl-row filters">
+        <div class="chips" id="vendorChips" aria-label="Vendor filter"></div>
+        <label class="ctl">Arch <select id="archSel"><option value="">All archs</option></select></label>
+        <label class="ctl">Generation <select id="genSel"><option value="">All generations</option></select></label>
+        <label class="ctl">VRAM ≥ <select id="vramSel">
+          <option value="0">Any</option><option value="4">4 GB</option><option value="6">6 GB</option>
+          <option value="8">8 GB</option><option value="10">10 GB</option><option value="12">12 GB</option>
+          <option value="16">16 GB</option><option value="20">20 GB</option><option value="24">24 GB</option>
+          <option value="32">32 GB</option>
+        </select></label>
+        <label class="ctl">Price ≤ $<span id="priceCapLbl">8200</span>
+          <input id="priceCap" type="range" min="50" max="8200" step="10" value="8200" />
+        </label>
+        <label class="ctl">TDP ≤ <span id="tdpCapLbl">any</span>
+          <input id="tdpCap" type="range" min="75" max="600" step="5" value="600" />
+        </label>
+        <label class="check" title="Hide cards with fewer than 10 sales in 30d, including stale prices with zero recent sales"><input type="checkbox" id="hideThin" /> hide thin/stale</label>
+        <label class="check" title="Hide pre-tensor cards that fall back to theoretical FP32"><input type="checkbox" id="tensorOnly" /> tensor silicon only</label>
+        <button class="reset" id="resetBtn" type="button">Reset</button>
+      </div>
+      <div class="ctl-row meta-row">
+        <span id="resultCount" class="result-count"></span>
+        <span class="spacer"></span>
+        <label class="check"><input type="checkbox" id="logX" checked /> log price</label>
+        <label class="check"><input type="checkbox" id="logY" checked /> log TFLOPS</label>
+        <label class="check"><input type="checkbox" id="paretoToggle" checked /> pareto frontier</label>
+      </div>
     </div>
   </div>
 </header>
 
 <main>
-  <section class="panel">
-    <h2>Leaderboard</h2>
-    <p class="hint">Bar = dense INT4 TFLOPS per dollar. Toggle sparse to double every bar (structured sparsity).</p>
+  <section class="panel" id="scatterPanel">
+    <div class="panel-head">
+      <div><h2>Price vs throughput <small id="scatterSub"></small></h2>
+      <p class="hint">Bubble size = VRAM. Colour = vendor. Click a bubble to pin details. Dashed line = pareto-optimal (no cheaper-and-faster alternative).</p></div>
+    </div>
+    <div class="scatter-wrap">
+      <svg id="scatter" viewBox="0 0 760 440" role="img" aria-label="Price versus throughput scatter plot"></svg>
+      <div class="tooltip" id="scatterTip" hidden></div>
+    </div>
+    <div class="legend" id="scatterLegend"></div>
+    <div class="pinned" id="pinnedBar" hidden></div>
+  </section>
+
+  <section class="panel" id="rankPanel">
+    <div class="panel-head"><div>
+      <h2>Leaderboard <small id="rankSub"></small></h2>
+      <p class="hint" id="rankHint"></p>
+    </div></div>
     <div id="board"></div>
   </section>
 
-  <section class="panel">
-    <h2>Compare all specs</h2>
+  <section class="panel" id="tablePanel" hidden>
+    <div class="panel-head"><div>
+      <h2>Compare <small id="tableSub"></small></h2>
+      <p class="hint">Click a column header to sort. Click a GPU name for full detail.</p>
+    </div></div>
     <div class="table-wrap"><table id="tbl">
-      <thead><tr>
-        <th data-k="short_name">GPU</th>
-        <th data-k="ai_tflops" class="num">INT4 TFLOPS</th>
-        <th data-k="price_usd" class="num">Used $ (30d)</th>
-        <th data-k="tflops_per_dollar" class="num">TFLOPS/$</th>
-        <th data-k="memory_gb" class="num">VRAM</th>
-        <th data-k="bandwidth_gbs" class="num">BW GB/s</th>
-        <th data-k="tdp_w" class="num">TDP</th>
-        <th data-k="bus_interface">Bus</th>
-      </tr></thead>
+      <thead><tr id="tblHead"></tr></thead>
       <tbody id="tbody"></tbody>
     </table></div>
   </section>
 
-  <section class="panel">
-    <h2>GPU detail cards</h2>
+  <section class="panel" id="cardsPanel" hidden>
+    <h2>GPU cards <small id="cardsSub"></small></h2>
+    <p class="hint">Every tensor format the card actually supports, with per-dollar math for the selected price basis. “—” means that format has no hardware on that card.</p>
     <div class="cards" id="cards"></div>
-  </section>
-
-  <section class="panel" id="unpricedPanel" hidden>
-    <h2>Awaiting price data</h2>
-    <p class="hint">Price fetch failed for these GPUs — specs shown, ranking withheld. Rerun the crawl with <code>--only &lt;id&gt;</code>.</p>
-    <div id="unpriced"></div>
   </section>
 
   <section class="panel two-col">
     <div>
-      <h2>Methodology</h2>
+      <h2>How to read this</h2>
       <ol class="method">
-        <li><strong>AI TFLOPS</strong> = dense max(FP4, INT4) from TPU <em>Matrix Performance</em>. Ampere has no FP4 hardware, so dense INT4 is used; sparse 2:4 (2&times;) plus INT8/FP16/BF16/TF32 tensor and FP32/FP16 theoretical are shown alongside. Where Matrix numbers are absent, the highest <em>Theoretical Performance</em> number is used.</li>
-        <li><strong>Price</strong> = SecondHandSilicon trailing-30-day mean of <em>used</em> eBay sold listings (API stat + independent recompute from raw listings in each JSON). Samples below 10 listings are flagged <span class="badge thin">thin</span>.</li>
-        <li><strong>Metric</strong> = AI TFLOPS &divide; price. Also stored: VRAM/$, bandwidth/$, W/TFLOP, sparse variant.</li>
+        <li><strong>Never mix bit-widths.</strong> FP4 throughput is ~2× INT8 on the same Blackwell die; INT4 is ~2× INT8 on Ampere/Ada. Ranking FP4 cards against INT4 cards is ranking different arithmetic. Use the precision tabs — each leaderboard only contains cards with hardware for that format.</li>
+        <li><strong>Metric</strong> = selected precision TFLOPS ÷ trailing-30-day mean (<span id="condName2">used</span> eBay sold). Sparse toggles structured 2:4 (2×) where the architecture supports it; otherwise sparse = dense.</li>
+        <li><strong>Practical picks:</strong> INT8 is the most cross-vendor comparable inference format; FP16/BF16 for training-adjacent work; FP32 for fallback / gaming-class cards without tensor cores.</li>
+        <li><strong>Thin data</strong> (n &lt; 10 sales in 30d) is badged, never silently dropped unless you tick “hide thin data”.</li>
       </ol>
     </div>
     <div>
-      <h2>Caveats &amp; provenance</h2>
+      <h2>Provenance</h2>
       <ul class="method">
-        <li>TPU specs are <strong>fully live</strong>: fetched with headed Chromium (<code>playwright-cli</code> solves the PoW; headless gets a hard 403). Raw pages archived as zstd blobs in <code>gpu.db:raw_pages</code>; each run diffs live values against the curated baseline (<code>tpu_discrepancies</code>, currently empty after fixing 13 real errors: PSU ratings, GA106 12.0B transistors, RTX 3050's 32 ROPs / PCIe x8 / 8-pin, 3080 die stepping).</li>
-        <li>RTX 3060 8GB has <strong>no TPU reference page</strong> (verified in the live DB table — AIB-only launch); its record is sibling-derived, memory per TPU news 300248.</li>
-        <li>3090/3090 Ti carry a large VRAM premium (24 GB) &mdash; worst TFLOPS/$ but best for large local models.</li>
-        <li>SHS 30-day means move daily; every record is timestamped (<code>pricing.fetched_at</code>).</li>
+        <li>TPU specs are <strong>fully live</strong> (headed Chromium). Raw pages archived as zstd blobs in <code>gpu.db:raw_pages</code>; sibling-derived SKUs (no TPU reference page) show “sibling-derived”, never a guessed URL.</li>
+        <li>SHS 30-day means move daily; every record is timestamped. Both <em>used</em> and <em>new</em> windows are stored — switch price basis above.</li>
+        <li>Cards without tensor hardware fall back to theoretical FP32 and are badged <span class="badge">theoretical fallback</span>.</li>
       </ul>
       <p class="downloads">Raw data (live from the database):
         <a href="../api/gpus">gpus.json</a> &middot;
@@ -95,6 +149,13 @@
     </div>
   </section>
 </main>
+
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="GPU detail">
+    <button class="modal-x" id="modalX" aria-label="Close">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
 
 <footer>
   <p>Built from <code>gpu.db</code> &middot; refresh with <code>python3 -m scraper.run --tpu-live-dir &lt;dir&gt;</code> &middot;
