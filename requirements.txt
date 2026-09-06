@@ -1,0 +1,4 @@
+beautifulsoup4>=4.12
+lxml>=5
+zstandard>=0.22
+# Live TPU fetch uses the playwright-cli binary (headed Chromium) via tools/fetch_tpu_live.sh

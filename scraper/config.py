@@ -1,0 +1,198 @@
+# RTX 30 series — canonical list for methodology test.
+# TPU IDs verified via websearch snippets (techpowerup.com/gpu-specs).
+# SHS slugs verified via https://secondhandsilicon.com/api/search?q=3090 etc.
+#
+# RTX 20 series — added second. TPU IDs read live from the GPU Database table
+# via headed Chromium (playwright-cli); SHS slugs via /api/search.
+
+GPUS = [
+    {
+        "id": "rtx-3090-ti",
+        "name": "NVIDIA GeForce RTX 3090 Ti",
+        "short_name": "RTX 3090 Ti",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3090-ti.c3829",
+        "tpu_id": "c3829",
+        "shs_slug": "nvidia-rtx-3090-ti",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3090-ti",
+    },
+    {
+        "id": "rtx-3090",
+        "name": "NVIDIA GeForce RTX 3090",
+        "short_name": "RTX 3090",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3090.c3622",
+        "tpu_id": "c3622",
+        "shs_slug": "nvidia-rtx-3090",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3090",
+    },
+    {
+        "id": "rtx-3080-ti",
+        "name": "NVIDIA GeForce RTX 3080 Ti",
+        "short_name": "RTX 3080 Ti",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3080-ti.c3735",
+        "tpu_id": "c3735",
+        "shs_slug": "nvidia-rtx-3080-ti",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3080-ti",
+    },
+    {
+        "id": "rtx-3080-12gb",
+        "name": "NVIDIA GeForce RTX 3080 12GB",
+        "short_name": "RTX 3080 12GB",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3080-12-gb.c3834",
+        "tpu_id": "c3834",
+        "shs_slug": "nvidia-rtx-3080-12gb",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3080-12gb",
+    },
+    {
+        "id": "rtx-3080-10gb",
+        "name": "NVIDIA GeForce RTX 3080 10GB",
+        "short_name": "RTX 3080 10GB",
+        "relperf_name": "GeForce RTX 3080",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3080.c3621",
+        "tpu_id": "c3621",
+        "shs_slug": "nvidia-rtx-3080-10gb",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3080-10gb",
+    },
+    {
+        "id": "rtx-3070-ti",
+        "name": "NVIDIA GeForce RTX 3070 Ti",
+        "short_name": "RTX 3070 Ti",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3070-ti.c3675",
+        "tpu_id": "c3675",
+        "shs_slug": "nvidia-rtx-3070-ti",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3070-ti",
+    },
+    {
+        "id": "rtx-3070",
+        "name": "NVIDIA GeForce RTX 3070",
+        "short_name": "RTX 3070",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3070.c3674",
+        "tpu_id": "c3674",
+        "shs_slug": "nvidia-rtx-3070",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3070",
+    },
+    {
+        "id": "rtx-3060-ti",
+        "name": "NVIDIA GeForce RTX 3060 Ti",
+        "short_name": "RTX 3060 Ti",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3060-ti.c3681",
+        "tpu_id": "c3681",
+        "shs_slug": "nvidia-rtx-3060-ti",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3060-ti",
+    },
+    {
+        "id": "rtx-3060-12gb",
+        "name": "NVIDIA GeForce RTX 3060 12GB",
+        "short_name": "RTX 3060 12GB",
+        "relperf_name": "GeForce RTX 3060 12 GB",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3060-12-gb.c3682",
+        "tpu_id": "c3682",
+        "shs_slug": "nvidia-rtx-3060-12gb",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3060-12gb",
+    },
+    {
+        "id": "rtx-3060-8gb",
+        "name": "NVIDIA GeForce RTX 3060 8GB",
+        "short_name": "RTX 3060 8GB",
+        # NO reference page exists on TPU (verified live 2026-09-06 via the GPU
+        # Database table: only 3060 12GB / Ti are listed; the 8GB was a quiet
+        # AIB-only launch). Specs inherit the 3060 12GB reference (same die,
+        # clocks, core config); memory subsystem (8GB/128-bit/240GB/s) per TPU
+        # news post https://www.techpowerup.com/300248/...
+        "tpu_url": None,
+        "tpu_id": None,
+        "shs_slug": "nvidia-rtx-3060-8gb",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3060-8gb",
+    },
+    {
+        "id": "rtx-3050-8gb",
+        "name": "NVIDIA GeForce RTX 3050 8GB",
+        "short_name": "RTX 3050 8GB",
+        "relperf_name": "GeForce RTX 3050 8 GB",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-3050-8-gb.c3858",
+        "tpu_id": "c3858",
+        "shs_slug": "nvidia-rtx-3050",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-3050",
+    },
+    # ---- RTX 20 series (Turing; PCIe 3.0; 2nd-gen Tensor, no FP4/FP8) ----
+    {
+        "id": "rtx-2080-ti",
+        "name": "NVIDIA GeForce RTX 2080 Ti",
+        "short_name": "RTX 2080 Ti",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-2080-ti.c3305",
+        "tpu_id": "c3305",
+        "shs_slug": "nvidia-rtx-2080-ti",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-2080-ti",
+    },
+    {
+        "id": "rtx-2080-super",
+        "name": "NVIDIA GeForce RTX 2080 Super",
+        "short_name": "RTX 2080 Super",
+        "relperf_name": "GeForce RTX 2080 SUPER",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-2080-super.c3439",
+        "tpu_id": "c3439",
+        "shs_slug": "nvidia-rtx-2080-super",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-2080-super",
+    },
+    {
+        "id": "rtx-2080",
+        "name": "NVIDIA GeForce RTX 2080",
+        "short_name": "RTX 2080",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-2080.c3224",
+        "tpu_id": "c3224",
+        "shs_slug": "nvidia-rtx-2080",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-2080",
+    },
+    {
+        "id": "rtx-2070-super",
+        "name": "NVIDIA GeForce RTX 2070 Super",
+        "short_name": "RTX 2070 Super",
+        "relperf_name": "GeForce RTX 2070 SUPER",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-2070-super.c3440",
+        "tpu_id": "c3440",
+        "shs_slug": "nvidia-rtx-2070-super",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-2070-super",
+    },
+    {
+        "id": "rtx-2070",
+        "name": "NVIDIA GeForce RTX 2070",
+        "short_name": "RTX 2070",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-2070.c3252",
+        "tpu_id": "c3252",
+        "shs_slug": "nvidia-rtx-2070",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-2070",
+    },
+    {
+        "id": "rtx-2060-super",
+        "name": "NVIDIA GeForce RTX 2060 Super",
+        "short_name": "RTX 2060 Super",
+        "relperf_name": "GeForce RTX 2060 SUPER",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-2060-super.c3441",
+        "tpu_id": "c3441",
+        "shs_slug": "nvidia-rtx-2060-super",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-2060-super",
+    },
+    {
+        "id": "rtx-2060-6gb",
+        "name": "NVIDIA GeForce RTX 2060 6GB",
+        "short_name": "RTX 2060 6GB",
+        "relperf_name": "GeForce RTX 2060",
+        "tpu_url": "https://www.techpowerup.com/gpu-specs/geforce-rtx-2060.c3310",
+        "tpu_id": "c3310",
+        "shs_slug": "nvidia-rtx-2060-6gb",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-2060-6gb",
+    },
+    {
+        "id": "rtx-2060-12gb",
+        "name": "NVIDIA GeForce RTX 2060 12GB",
+        "short_name": "RTX 2060 12GB",
+        # NO reference page exists on TPU (verified live 2026-09-06 via the GPU
+        # Database table: only 2060 6GB / Super are listed; the 12GB was a
+        # quiet AIB-only refresh). Inherits the 2060 6GB reference die data;
+        # core config + memory per contemporary coverage (2176 CUDA / 12GB /
+        # 192-bit); MSRP uncertain (no official figure; SHS base $349).
+        "tpu_url": None,
+        "tpu_id": None,
+        "shs_slug": "nvidia-rtx-2060-12gb",
+        "shs_url": "https://secondhandsilicon.com/product/nvidia-rtx-2060-12gb",
+    },
+]

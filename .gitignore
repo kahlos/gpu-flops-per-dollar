@@ -1,0 +1,15 @@
+# --- data: crawl outputs stay local, never committed ---
+/gpu.db
+/gpu.db-shm
+/gpu.db-wal
+*.db-shm
+*.db-wal
+# --- env / bytecode ---
+.venv/
+__pycache__/
+*.py[cod]
+# --- headless/headed browser session files ---
+.playwright-cli/
+# --- OS / logs ---
+.DS_Store
+*.log
