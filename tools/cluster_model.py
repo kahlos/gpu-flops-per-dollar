@@ -18,7 +18,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-# -------- workload (DeepSeek V4 Flash 0731 per INT4-VIABILITY doc) -----------
+# ---- workload (DeepSeek V4 Flash 0731 scenario; docs/CLUSTER-VIABILITY-ANALYSIS.md section 1) ----
 P_TOTAL, P_ACT, LAYERS, D_MODEL = 284e9, 13e9, 43, 4096
 FLOP_TOK = 2 * P_ACT * 1.10
 FLOP_LAYER = FLOP_TOK / LAYERS

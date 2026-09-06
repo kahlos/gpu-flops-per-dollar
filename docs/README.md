@@ -21,10 +21,8 @@ gpu.db          THE database (SQLite + zstd-22, ~1 MB for 19 GPUs)
 serve           one-command launcher: site + JSON API from gpu.db
 docs/           README.md (this index), METHODOLOGY.md, PIPELINE.md,
                 SCHEMA.md (table reference), API.md, ROADMAP.md,
-                CLUSTER-VIABILITY-ANALYSIS.md (cluster economics vs API),
-                INT4-VIABILITY-RESEARCH.MD, TOKEN-ECONOMICS-RESEARCH.md,
-                Legacy-AI-Hardware-TCO-Analysis.md (earlier research; see the
-                viability report's reconciliation section before using)
+                CLUSTER-VIABILITY-ANALYSIS.md (single consolidated research
+                doc: model spec, cluster economics vs API, research history)
 scraper/        crawl code: config, TPU parsers, SHS client, curated baseline, run.py
 dbtools/        database code: schema.sql, store, query, delta, pack, maint
 website/        static site, live-only (reads /api/bundle from gpu.db)
@@ -62,11 +60,15 @@ query.get_listings(con, 'rtx-3090', 'used')['rows']  # [[date, price, title]]
 - `SCHEMA.md` — table/column reference and storage format.
 - `API.md` — live endpoint reference with curl/Python examples.
 - `ROADMAP.md` — must-dos (FP4 selection before Blackwell!), scale-up plan, open ideas.
-- `CLUSTER-VIABILITY-ANALYSIS.md` — can a used-GPU cluster undercut DeepSeek
-  V4 Flash API pricing? Verdict + triple-checked model; reproducible via
-  `tools/cluster_model.py` (the .py is the authority). The two TOKEN-ECONOMICS/
-  TCO research docs are superseded on economics (unit-slip bugs) — read the
-  reconciliation section first.
+- `CLUSTER-VIABILITY-ANALYSIS.md` — the single consolidated research document:
+  DeepSeek V4 Flash 0731 model spec, the used-GPU cluster economics vs the API
+  pricing benchmark, and the research history with a 14-entry error ledger.
+  Verdict: PP43 + W4A4 + FP8 activations on 43x RTX 3080 10GB = 252K tok/s at
+  ~$0.006/1M all-in vs $0.1741 API blend (~30x); break-even at ~2% duty.
+  Reproduce with `tools/cluster_model.py` (the .py is the authority). Three
+  earlier research reports were merged into it and retired — originals in git
+  history (commit 3e98f0c); do not resurrect their economics without reading
+  the error ledger (section 11) first.
 
 ## Sources
 
