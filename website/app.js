@@ -21,6 +21,12 @@
 
   const val = (r) => sparseToggle.checked ? r.ai_compute.ai_tflops_per_dollar_sparse : r.ai_compute.ai_tflops_per_dollar;
   const tflops = (r) => sparseToggle.checked ? r.ai_compute.ai_tflops_sparse : r.ai_compute.ai_tflops;
+  // Null-safe formatters: old/pre-Tensor cards lack matrix rows, fresh cards
+  // can lack medians — render "—", never throw.
+  const F1 = (x) => (x == null ? "—" : x.toFixed(1));
+  const F2 = (x) => (x == null ? "—" : x.toFixed(2));
+  const F3 = (x) => (x == null ? "—" : x.toFixed(3));
+  const FM = (x) => (x == null ? "—" : "$" + x);
 
   function filtered() {
     const needle = (q.value || "").toLowerCase().trim();
@@ -53,7 +59,12 @@
   }
 
   function render() {
-    const rows = filtered();
+    const all = filtered();
+    // GPUs whose price fetch failed have pricing:null (or a null price).
+    // They cannot rank — isolate them instead of letting one break the page.
+    const priced = (r) => r.pricing && r.pricing.price_usd_last30d_avg_api != null;
+    const rows = all.filter(priced);
+    const unpriced = all.filter((r) => !priced(r));
     const max = Math.max(...rows.map(val), 1e-9);
     document.querySelectorAll("#tbl th").forEach((th) => {
       th.onclick = () => {
@@ -66,14 +77,14 @@
       <div class="row${i === 0 ? " top" : ""}">
         <div class="nm">${i === 0 ? "👑 " : ""}${r.short_name}<small>${r.ai_compute.ai_precision_used} · ${r.specs.memory_size_gb}GB ${r.specs.memory_type}</small></div>
         <div class="bar"><i style="width:${(100 * val(r) / max).toFixed(1)}%"></i></div>
-        <div class="val"><b>${val(r).toFixed(3)} TFLOPS/$</b><span>${tflops(r).toFixed(1)} TFLOPS · $${r.pricing.price_usd_last30d_avg_api}</span></div>
+        <div class="val"><b>${F3(val(r))} TFLOPS/$</b><span>${F1(tflops(r))} TFLOPS · $${r.pricing.price_usd_last30d_avg_api}</span></div>
       </div>`).join("");
 
     tbody.innerHTML = rows.map((r) => `
-      <tr><td><a href="#${r.id}">${r.short_name}</a></td><td class="num">${tflops(r).toFixed(1)}</td>
-      <td class="num">$${r.pricing.price_usd_last30d_avg_api}</td><td class="num"><strong>${val(r).toFixed(3)}</strong></td>
+      <tr><td><a href="#${r.id}">${r.short_name}</a></td><td class="num">${F1(tflops(r))}</td>
+      <td class="num">$${r.pricing.price_usd_last30d_avg_api}</td><td class="num"><strong>${F3(val(r))}</strong></td>
       <td class="num">${r.specs.memory_size_gb} GB</td><td class="num">${r.specs.memory_bandwidth_gbs}</td>
-      <td class="num">${r.specs.tdp_w} W</td><td>${r.specs.bus_interface}</td></tr>`).join("");
+      <td class="num">${r.specs.tdp_w} W</td><td>${r.specs.bus_interface ?? "—"}</td></tr>`).join("");
 
     cards.innerHTML = rows.map((r) => {
       const p = r.pricing, d = p ? p.price_30d_detail : {};
@@ -83,36 +94,48 @@
       return `<article class="card" id="${r.id}">
         <h3>${r.short_name}</h3>
         <div class="badges">
-          <span class="badge hot">${val(r).toFixed(3)} TFLOPS/$${sparseToggle.checked ? " sparse" : ""}</span>
+          <span class="badge hot">${F3(val(r))} TFLOPS/$${sparseToggle.checked ? " sparse" : ""}</span>
           <span class="badge">${r.specs.memory_size_gb}GB ${r.specs.memory_type}</span>
           <span class="badge">${r.specs.memory_bandwidth_gbs} GB/s</span>
-          <span class="badge">${r.specs.tdp_w}W · ${r.specs.bus_interface}</span>
+          <span class="badge">${r.specs.tdp_w}W · ${r.specs.bus_interface ?? "—"}</span>
           ${thin}
         </div>
         <div class="kv">
-          <div><span>AI INT4 dense / sparse</span><b>${r.ai_compute.ai_tflops.toFixed(1)} / ${r.ai_compute.ai_tflops_sparse.toFixed(1)} T</b></div>
-          <div><span>INT8 / FP16 tensor</span><b>${m.int8_dense_tops.toFixed(1)} / ${m.fp16_dense_tflops.toFixed(1)} T</b></div>
-          <div><span>BF16 / TF32 tensor</span><b>${m.bf16_dense_tflops != null ? m.bf16_dense_tflops.toFixed(2) : "—"} / ${m.tf32_dense_tflops != null ? m.tf32_dense_tflops.toFixed(2) : "—"} T</b></div>
+          <div><span>AI ${r.ai_compute.ai_precision_used || "compute"}</span><b>${F1(r.ai_compute.ai_tflops)} / ${F1(r.ai_compute.ai_tflops_sparse)} T</b></div>
+          <div><span>INT8 / FP16 tensor</span><b>${F1(m.int8_dense_tops)} / ${F1(m.fp16_dense_tflops)} T</b></div>
+          <div><span>BF16 / TF32 tensor</span><b>${F2(m.bf16_dense_tflops)} / ${F2(m.tf32_dense_tflops)} T</b></div>
           <div><span>Used 30d avg</span><b>$${p.price_usd_last30d_avg_api} (n=${q.n_30d})</b></div>
-          <div><span>30d median/range</span><b>$${p.price_median_30d} · $${d.min_30d}–$${d.max_30d}</b></div>
-          <div><span>FP32 / FP16 theo</span><b>${r.theoretical_performance.fp32_tflops} T</b></div>
-          <div><span>CUDA / SM / TMU / ROP</span><b>${r.specs.cuda_cores} / ${r.specs.sm_count} / ${r.specs.tmu} / ${r.specs.rop}</b></div>
-          <div><span>Boost / mem</span><b>${r.specs.boost_clock_mhz} MHz · ${r.specs.memory_clock_effective_gbps} Gbps</b></div>
-          <div><span>VRAM/$ · W/TFLOP</span><b>${r.vram_per_dollar_gb} GB · ${r.watts_per_tflops} W</b></div>
+          <div><span>30d median/range</span><b>${FM(p.price_median_30d)} · ${FM(d.min_30d)}–${FM(d.max_30d)}</b></div>
+          <div><span>FP32 / FP16 theo</span><b>${F1(r.theoretical_performance.fp32_tflops)} / ${F1(r.theoretical_performance.fp16_tflops)} T</b></div>
+          <div><span>CUDA / SM / TMU / ROP</span><b>${r.specs.cuda_cores ?? "—"} / ${r.specs.sm_count ?? "—"} / ${r.specs.tmu ?? "—"} / ${r.specs.rop ?? "—"}</b></div>
+          <div><span>Boost / mem</span><b>${r.specs.boost_clock_mhz ?? "—"} MHz · ${r.specs.memory_clock_effective_gbps ?? "—"} Gbps</b></div>
+          <div><span>VRAM/$ · W/TFLOP</span><b>${r.vram_per_dollar_gb ?? "—"} GB · ${r.watts_per_tflops ?? "—"} W</b></div>
         </div>
         ${sparkline(p.monthly_buckets)}
         <div class="links">${r.sources.tpu_url ? `<a href="${r.sources.tpu_url}">TPU specs ↗</a>` : `<span style="color:var(--mut)" title="No TPU reference page exists; derived from sibling SKU">TPU: sibling-derived</span>`}<a href="${r.sources.shs_url}">SHS price ↗</a>
-        <span style="color:var(--mut)">MSRP $${r.specs.launch_msrp_usd} · ${r.specs.launch_date}</span></div>
+        <span style="color:var(--mut)">MSRP ${r.specs.launch_msrp_usd == null ? "—" : "$" + r.specs.launch_msrp_usd} · ${r.specs.launch_date ?? "—"}</span></div>
       </article>`;
     }).join("");
 
-    const best = [...DATA].sort((a, b) => b.ai_compute.ai_tflops_per_dollar - a.ai_compute.ai_tflops_per_dollar)[0];
-    const vramKing = [...DATA].sort((a, b) => b.specs.memory_size_gb - a.specs.memory_size_gb || a.pricing.price_usd_last30d_avg_api - b.pricing.price_usd_last30d_avg_api)[0];
-    $("#heroStats").innerHTML = `
-      <div class="stat"><b>${best.short_name}</b><span>best value · ${best.ai_compute.ai_tflops_per_dollar.toFixed(3)} TFLOPS/$</span></div>
+    const upanel = $("#unpricedPanel");
+    if (upanel) {
+      upanel.hidden = unpriced.length === 0;
+      $("#unpriced").innerHTML = unpriced.map((r) => `
+        <div class="row">
+          <div class="nm">${r.short_name}<small>${r.specs.memory_size_gb ?? "—"}GB ${r.specs.memory_type ?? ""} · ${F1(r.ai_compute.ai_tflops)} TFLOPS (no price yet)</small></div>
+          <div class="bar"><i style="width:0%"></i></div>
+          <div class="val"><b>—</b><span>price fetch failed · <a href="${r.sources.shs_url}">SHS ↗</a> · rerun crawl --only ${r.id}</span></div>
+        </div>`).join("");
+    }
+
+    const best = [...rows].sort((a, b) => b.ai_compute.ai_tflops_per_dollar - a.ai_compute.ai_tflops_per_dollar)[0];
+    const vramKing = [...rows].sort((a, b) => b.specs.memory_size_gb - a.specs.memory_size_gb || a.pricing.price_usd_last30d_avg_api - b.pricing.price_usd_last30d_avg_api)[0];
+    $("#heroStats").innerHTML = rows.length ? `
+      <div class="stat"><b>${best.short_name}</b><span>best value · ${F3(best.ai_compute.ai_tflops_per_dollar)} TFLOPS/$</span></div>
       <div class="stat"><b>${DATA.length} GPUs</b><span>${SUMMARY.coverage || ""} · dense max(FP4,INT4)</span></div>
-      <div class="stat"><b>$${Math.min(...DATA.map((r) => r.pricing.price_usd_last30d_avg_api))}–$${Math.max(...DATA.map((r) => r.pricing.price_usd_last30d_avg_api))}</b><span>used 30-day range</span></div>
-      <div class="stat"><b>${vramKing.short_name} ${vramKing.specs.memory_size_gb}GB</b><span>VRAM pick · $${vramKing.pricing.price_usd_last30d_avg_api}</span></div>`;
+      <div class="stat"><b>$${Math.min(...rows.map((r) => r.pricing.price_usd_last30d_avg_api))}–$${Math.max(...rows.map((r) => r.pricing.price_usd_last30d_avg_api))}</b><span>used 30-day range</span></div>
+      <div class="stat"><b>${vramKing.short_name} ${vramKing.specs.memory_size_gb}GB</b><span>VRAM pick · $${vramKing.pricing.price_usd_last30d_avg_api}</span></div>`
+      : `<div class="stat"><b>No priced GPUs</b><span>all price fetches failed — rerun the crawl</span></div>`;
     if (SUMMARY) $("#genAt").textContent =
       "Live from gpu.db · " + new Date(SUMMARY.generated_at).toLocaleString();
     if (SUMMARY && SUMMARY.coverage) {

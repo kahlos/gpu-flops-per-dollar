@@ -119,12 +119,14 @@ def upsert_gpu(con: sqlite3.Connection, r: dict) -> None:
 def replace_pricing(con: sqlite3.Connection, gpu_id: str, shs: dict) -> None:
     for cond, key in (("used", "used"), ("new", "new")):
         d = shs.get(key)
+        if not d:
+            # Fetch failed: keep previous rows. Deleting here would destroy
+            # good data and break the site (null pricing crashes rendering).
+            continue
         con.execute("DELETE FROM monthly WHERE gpu_id=? AND cond=?", (gpu_id, cond))
         con.execute("DELETE FROM windows WHERE gpu_id=? AND cond=?", (gpu_id, cond))
         con.execute("DELETE FROM cond_stats WHERE gpu_id=? AND cond=?", (gpu_id, cond))
         con.execute("DELETE FROM listing_blobs WHERE gpu_id=? AND cond=?", (gpu_id, cond))
-        if not d:
-            continue
         for b in d["monthly"]:
             con.execute(
                 "INSERT INTO monthly VALUES (?,?,?,?,?,?,?,?,?,?,?)",

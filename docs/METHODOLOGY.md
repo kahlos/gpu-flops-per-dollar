@@ -6,21 +6,22 @@ Locked decisions live in `summary.decisions` inside `gpu.db` (`runs` table).
 ## The metric
 
 ```
-AI_TFLOPS  = dense max(FP4, INT4)      # from TPU Matrix Performance
+AI_TFLOPS  = dense max over available tensor precisions (TPU Matrix Performance)
 price      = SHS trailing-30d mean, used eBay sold listings
 metric     = AI_TFLOPS / price          # + sparse variant alongside
 ```
 
-- **Precision selection.** Ampere and Turing have no FP4 hardware, so INT4
-  dense is the effective input today. ⚠️ The current code (`run.py`, `ai_t`)
-  reads INT4 directly — **before adding any FP4-capable card (Blackwell+),
-  this must become `max()` over available precisions** (see `docs/ROADMAP.md`).
+- **Precision selection.** The winner is the highest dense Matrix number
+  (FP4 > INT4 > INT8/FP8 > FP16/BF16 > TF32 in practice), recorded in
+  `ai.prec`. Ampere/Turing have no FP4 so INT4 wins; Blackwell lists FP4
+  (no INT4 row); Volta (V100) has FP16-only tensor hardware so FP16 wins
+  there. Implemented in `run.py` (`max()` over available precisions).
 - **Sparsity is never primary.** Sparse (2:4) throughput is stored alongside
   (`ai_ts`, `ai_pds`) but ranking uses dense. The multiplier comes from TPU's
   sparse note (Ampere 2×); architectures without it (Turing) get 1×, not 2×.
 - **Theoretical fallback.** Where Matrix numbers are absent, the highest
-  Theoretical number is used instead. Not yet exercised — all 19 GPUs have
-  Matrix blocks; a Tensor-less card (e.g. GTX 16-class) would take this path.
+  Theoretical number is used instead (first exercised by GTX 16/10-class
+  cards; RDNA 1/2 take the FP16 path via packed-math theoretical rates).
 - **Auxiliary metrics** (all stored): VRAM/$, bandwidth/$, W/TFLOP,
   MSRP depreciation + retention in basis points.
 
@@ -59,3 +60,8 @@ metric     = AI_TFLOPS / price          # + sparse variant alongside
 - TPU review-aggregate gaming data (`relperf`) is page-relative (% of that
   page's own card) and only covers reviewed cards — a bonus signal, not a metric.
 - MSRP is informational (depreciation only); street reality is the used price.
+- Dual-GPU cards (GTX 690, Titan Z): TPU reports per-GPU specs, but the
+  price is per card — compute fields are stored as board totals (2x) via
+  documented `tpu_overrides` so the metric stays card-level. Both GPUs are
+  independently usable for compute; memory is board total, bandwidth
+  per-GPU (not pooled).

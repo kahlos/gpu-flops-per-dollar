@@ -6,8 +6,11 @@ trailing-30-day used price from SecondHandSilicon (eBay sold listings) — plus
 the memory, bandwidth, power and interface context needed to judge real
 deployability. Full rules: `docs/METHODOLOGY.md`.
 
-**Status:** 19 GPUs (RTX 20 + 30) in `gpu.db`. Leader at last crawl: RTX 2080
-Super, 1.62 TFLOPS/$ (live values: `./serve`, then `/api/gpus`, or
+**Status:** 157 GPUs in `gpu.db` — GeForce GTX 400 → RTX 50 (incl. dual-GPU
+boards + all Titans), Radeon HD 5000 → RX 9000 (incl. R9 Fury/Nano-era
+flagships), Intel Arc A/B, Quadro K/M/P/RTX + RTX Ax000 workstation cards,
+Tesla K/M/P/V/A100 datacenter cards, Radeon Pro W7800. Leader at last crawl:
+RTX 2080 Super, 1.62 TFLOPS/$ (live values: `./serve`, then `/api/gpus`, or
 `SELECT short_name, ai_pd/10000.0 FROM gpus ORDER BY ai_pd DESC` — never trust a
 frozen table when the database is right there).
 

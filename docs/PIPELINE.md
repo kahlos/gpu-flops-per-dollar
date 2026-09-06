@@ -164,7 +164,30 @@ docs only. A full (non-`--only`) run afterwards refreshes everything.
 | `history +N` on identical data | Change-hash inputs changed (frozen-form lesson) → one-time re-baseline, then `+0` |
 | `-shm`/`-wal` files next to `gpu.db` | Un-checkpointed WAL → runs checkpoint on commit; `VACUUM` in maint |
 | `.playwright-cli/` in repo | Browser session ran with repo as CWD → delete; fetch script cds to scratch |
+| `Cannot read properties of null (reading 'price_usd_…')` | GPU with failed price fetch — fixed: fetches never wipe previous rows, site isolates unpriced cards, crawl exits 2 with retry command |
+| `…(reading 'toFixed')` or literal `null`/`NaN` on cards | Pre-Tensor cards lack matrix rows; old cards lack clocks/MSRP — fixed: null-preserving loader math, `F1/F2/F3/FM` formatters, `?? "—"` on spec interpolations |
 | `record_sha` edits | **Frozen discipline**: changing its canonical form re-baselines ALL history — treat as a migration, not a tweak |
+| `database is locked` on crawl | Another crawl is mid-commit (WAL checkpoint holds EXCLUSIVE) → never run two crawls concurrently; never `kill -9` a committing process (can orphan WAL frames); wait for the lock holder, then verify row counts |
+| Background crawl "completes" but rows missing | Killed mid-checkpoint (see above) → re-crawl the batch; `history` dedup makes reruns cheap |
+
+## Scale-up lessons (bulk expansion runs)
+
+- **TPU table renders ~101 recent rows only** — older/workstation cards are
+  invisible there. Resolve their IDs via websearch snippets (canonical
+  `.../gpu-specs/<slug>.cXXXX` URLs), then verify each with a headed visit
+  (title must match) before adding to `config.py`.
+- **TPU unit traps** (all fixed in `tpu_live.py`, keep them in mind for new
+  fields): bandwidth `TB/s` (×1000); Theoretical FP16/FP32/FP64 cells mix
+  TFLOPS/GFLOPS by card age; Memory Size in MB pre-2012; transistors in
+  millions for sub-billion dice; HBM memory clocks in Mbps.
+- **Variant entries sharing one TPU page** (4GB/8GB twins, dual-GPU boards):
+  use `tpu_overrides` in `config.py` for entry-defining fields so live-wins
+  doesn't erase the variant (memory size, board-total compute). Overrides
+  participate in the live-vs-curated diff, so matching curated values stay
+  DIFF-free.
+- **SHS throttling**: batches of ~20 GPUs (80 calls) take several minutes;
+  run crawls in background, one at a time, and expect occasional
+  `TimeoutError -> missing` conditions (retry on the next full run).
 
 ## Scheduling
 

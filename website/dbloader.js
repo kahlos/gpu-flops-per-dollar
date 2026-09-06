@@ -7,6 +7,7 @@
   const P = (i) => (i === null || i === undefined ? null : pool[i]);
   const PF = ["ok", "thin", "missing"];
   const D = (c) => (c === null || c === undefined ? null : c / 100);
+  const N = (x, f) => (x === null || x === undefined ? null : x / f);
 
   function cond(c) {
     if (!c) return null;
@@ -19,8 +20,8 @@
       avg_usd: D(c.avg), api_avg_usd: D(c.api),
       canon_usd: c.api !== null && c.api !== undefined ? D(c.api) : D(c.avg),
       windows: w,
-      monthly: c.m.map((r) => ({ mkey: r[0], avg: D(r[1]), min: D(r[2]), max: D(r[3]), std: D(r[4]), tot: r[5], nw: r[6], used: r[7], chg: r[8] / 100 })),
-      chg_pct: c.chg / 100, yr_hi: D(c.yh), yr_lo: D(c.yl), total: c.tot, bench: c.bn,
+      monthly: c.m.map((r) => ({ mkey: r[0], avg: D(r[1]), min: D(r[2]), max: D(r[3]), std: D(r[4]), tot: r[5], nw: r[6], used: r[7], chg: r[8] == null ? null : r[8] / 100 })),
+      chg_pct: c.chg == null ? null : c.chg / 100, yr_hi: D(c.yh), yr_lo: D(c.yl), total: c.tot, bench: c.bn,
     };
   }
 
@@ -28,8 +29,8 @@
     const s = c.sp, u = cond(c.pr.u);
     const price = u ? u.canon_usd : null;
     const w30 = u ? u.windows["30d"] : { n: 0, avg: null, med: null, lo: null, hi: null };
-    const aiT = c.ai.t / 100, aiTs = c.ai.ts / 100;
-    const bw = s.bw / 10, vgb = s.vgb;
+    const aiT = N(c.ai.t, 100), aiTs = N(c.ai.ts, 100);
+    const bw = N(s.bw, 10), vgb = s.vgb;
     return {
       id: c.i, short_name: P(c.n), name: P(c.f),
       sources: {
@@ -39,7 +40,7 @@
       },
       specs: {
         memory_size_gb: vgb, memory_type: P(s.vty), memory_bandwidth_gbs: bw, tdp_w: s.tdp,
-        bus_interface: P(s.bif), boost_clock_mhz: s.kcl, memory_clock_effective_gbps: s.mcl / 10,
+        bus_interface: P(s.bif), boost_clock_mhz: s.kcl, memory_clock_effective_gbps: N(s.mcl, 10),
         cuda_cores: s.cud, sm_count: s.sm, tmu: s.tmu, rop: s.rop,
         launch_msrp_usd: s.msrp, launch_date: s.lch,
       },
@@ -50,10 +51,10 @@
       },
       ai_compute: {
         ai_tflops: aiT, ai_tflops_sparse: aiTs,
-        ai_tflops_per_dollar: c.ai.pd / 10000, ai_tflops_per_dollar_sparse: c.ai.pds / 10000,
+        ai_tflops_per_dollar: N(c.ai.pd, 10000), ai_tflops_per_dollar_sparse: N(c.ai.pds, 10000),
         ai_precision_used: P(c.ai.pu),
       },
-      theoretical_performance: { fp32_tflops: c.th.f32 / 100 },
+      theoretical_performance: { fp32_tflops: N(c.th.f32, 100), fp16_tflops: N(c.th.f16, 100) },
       pricing: u ? {
         price_usd_last30d_avg_api: price,
         price_30d_detail: { count_30d: w30.n, min_30d: w30.lo, max_30d: w30.hi },
@@ -63,7 +64,7 @@
       } : null,
       vram_per_dollar_gb: price ? +(vgb / price).toFixed(4) : null,
       bandwidth_per_dollar: price ? +(bw / price).toFixed(4) : null,
-      watts_per_tflops: +(s.tdp / aiT).toFixed(3),
+      watts_per_tflops: (aiT ? +(s.tdp / aiT).toFixed(3) : null),
     };
   });
   return { data, summary: DB.summary };

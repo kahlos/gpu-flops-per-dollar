@@ -1,32 +1,48 @@
 # Roadmap
 
-Prioritized future work. Status context: 19 GPUs (RTX 20 + 30), single-file
-`gpu.db`, live API + site, manual crawls.
+Prioritized future work. Status context: ~150 GPUs (GeForce GTX 400 → RTX
+50, Radeon HD 5000 → RX 9000, Arc A/B, Quadro/Tesla, Titans), single-file
+`gpu.db`, live API + site, batched crawls (see PIPELINE scale-up lessons).
 
-## Must-do before new architectures
+## Done (bulk expansion)
 
-- **FP4 selection logic.** `run.py` hardcodes `ai_t = matrix INT4` (correct for
-  Turing/Ampere, which lack FP4). Before adding any Blackwell+ card, implement
-  `max()` over available precisions per `docs/METHODOLOGY.md`, with
-  `ai_precision_used` recording the winner. The `fp4`/`fp8` columns and null
-  handling already exist.
+- **Precision selection.** `run.py` takes the dense `max()` over available
+  tensor precisions with `ai.prec` recording the winner (FP4 Blackwell,
+  INT4 Ampere/Turing/Ada/RDNA3-4/XMX, FP16-matrix Volta, Theoretical
+  fallback for Tensor-less). METHODOLOGY updated.
+- **Theoretical-fallback canary.** GTX 16/10-class + GCN/TeraScale cards
+  exercise the fallback path (highest Theoretical number).
+- **Parser unit traps fixed** (TB/s bandwidth, TFLOPS/GFLOPS Theoretical
+  cells, MB memory sizes, million-transistor dice, Mbps HBM clocks).
+- **Nullable spec fields** (SM/Tensor/RT/clocks for AMD/Intel/old cards),
+  **sparse-capable architecture set**, **vendor-prefix display names**,
+  **`tpu_overrides`** for variant/shared pages and dual-GPU board totals.
 - **`record_sha` is frozen.** Its canonical form (timestamp-excluded expanded
   doc) defines history identity — changing it re-baselines every GPU's history.
-  Treat edits as migrations.
+  Treat edits as migrations. (Verified stable across the bulk expansion:
+  all pre-existing rows kept their hashes.)
 
-## Scale-up (the stated goal: all historical GPUs)
+## Scale-up (remaining)
 
 - **Discovery automation:** script `config.py` growth from SHS `/api/search`
   sweeps + the TPU database table (headed session), emitting candidate entries
-  with source URLs for human review.
+  with source URLs for human review. (Note: TPU table renders ~101 recent
+  rows only; older/workstation IDs come from websearch snippets + headed
+  title verification.)
 - **Batch dump tooling:** `fetch_tpu_live.sh` has a hardcoded URL map — generate
   it from `config.py` (missing-page SKUs only) so dumps stay in sync.
-- **GTX 16-class cards** exercise the theoretical-fallback path for the first
-  time (no Tensor cores) — good canary for methodology edge cases.
 - **Workstation/DC cards:** schema fields already reserved (`form_factor`,
   `interconnect`, `mig`); SHS coverage will be thinner — expect `thin` flags.
 - **Crawl cadence:** weekly full runs are plenty (specs static, SHS daily);
   monitor SHS call volume (~4 calls/GPU).
+- **Deferred for lack of TPU reference page** (strict rule; re-verify
+  periodically): Quadro K600/K620/K4000/K5000, Tesla K40 (K40c vs K40s
+  ambiguous) / M60, GTX 590, HD 6990, Radeon Pro Duo, RTX A2000,
+  TITAN X (Pascal, no SHS slug either).
+- **Out for lack of SHS price coverage** (re-check `/api/search`
+  periodically): RTX 3050 6GB, RTX 5050, Titan V, H100/H200/B200, L40/L4,
+  Instinct MI-*, FirePro-*, Flex/Max series, GTX 750 Ti/1050 Ti/1630,
+  RX Vega 56/64, R9 280X/285/380-series.
 
 ## Data quality
 

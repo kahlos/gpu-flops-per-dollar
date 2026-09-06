@@ -85,6 +85,50 @@ def _f(text: str | None) -> float | None:
         return None
 
 
+def _tflops(text: str | None) -> float | None:
+    """Theoretical TFLOPS cell: TPU mixes TFLOPS/GFLOPS units by card age
+    (e.g. 4090 FP64 '1.290 TFLOPS' vs 4080 '761.5 GFLOPS'; Pascal FP16 in
+    GFLOPS). Normalize to TFLOPS."""
+    if not text:
+        return None
+    v = _f(text)
+    if v is None:
+        return None
+    return v / 1000.0 if "GFLOPS" in text.upper() else v
+
+
+def _gflops(text: str | None) -> float | None:
+    """Theoretical FP64 cell: normalize to GFLOPS (TPU mixes units)."""
+    if not text:
+        return None
+    v = _f(text)
+    if v is None:
+        return None
+    return v * 1000.0 if "TFLOPS" in text.upper() else v
+
+
+def _transb(text: str | None) -> float | None:
+    """Transistors cell: TPU uses billions for big dice, millions for small
+    ones (e.g. Oland '950 million'). Normalize to billions."""
+    if not text:
+        return None
+    v = _f(text)
+    if v is None:
+        return None
+    return v / 1000.0 if "MILLION" in text.upper() else v
+
+
+def _memgb(text: str | None) -> float | None:
+    """Memory Size cell: TPU uses GB for modern cards, MB for Fermi-era
+    (e.g. GTX 480 '1536 MB'). Normalize to GB."""
+    if not text:
+        return None
+    v = _f(text)
+    if v is None:
+        return None
+    return v / 1024.0 if "MB" in text.upper() and "GB" not in text.upper() else v
+
+
 def normalize(sections: dict[str, dict[str, str]]) -> dict:
     g = lambda s, k: sections.get(s, {}).get(k)
     gp, gc = sections.get("Graphics Processor", {}), sections.get("Graphics Card", {})
@@ -94,6 +138,13 @@ def normalize(sections: dict[str, dict[str, str]]) -> dict:
     gf, nf = sections.get("Graphics Features", {}), sections.get("Numeric Format Support", {})
     mem_clk = clk.get("Memory Clock", "")
     m_gbps = re.search(r"([\d.]+)\s*Gbps", mem_clk)
+    m_mbps = re.search(r"([\d.]+)\s*Mbps", mem_clk)
+    if m_gbps:
+        mem_eff = float(m_gbps.group(1))
+    elif m_mbps:
+        mem_eff = float(m_mbps.group(1)) / 1000.0
+    else:
+        mem_eff = None
     mem_bw_raw = mem.get("Bandwidth", "")
     m_tb = re.search(r"([\d.]+)\s*TB/s", mem_bw_raw)
     bw = float(m_tb.group(1)) * 1000 if m_tb else _f(mem_bw_raw)
@@ -104,7 +155,7 @@ def normalize(sections: dict[str, dict[str, str]]) -> dict:
         "foundry": gp.get("Foundry"),
         "process": gp.get("Process Type"),
         "process_nm": _f(gp.get("Process Size")),
-        "transistors_b": _f(gp.get("Transistors")),
+        "transistors_b": _transb(gp.get("Transistors")),
         "die_size_mm2": _f(gp.get("Die Size")),
         "release_date": gc.get("Release Date"),
         "launch_price_usd": _f(gc.get("Launch Price")),
@@ -112,8 +163,8 @@ def normalize(sections: dict[str, dict[str, str]]) -> dict:
         "bus_interface": gc.get("Bus Interface"),
         "base_clock_mhz": _f(clk.get("Base Clock")),
         "boost_clock_mhz": _f(clk.get("Boost Clock")),
-        "memory_clock_effective_gbps": float(m_gbps.group(1)) if m_gbps else None,
-        "memory_size_gb": _f(mem.get("Memory Size")),
+        "memory_clock_effective_gbps": mem_eff,
+        "memory_size_gb": _memgb(mem.get("Memory Size")),
         "memory_type": mem.get("Memory Type"),
         "memory_bus_bits": _f(mem.get("Memory Bus")),
         "memory_bandwidth_gbs": bw,
@@ -126,11 +177,13 @@ def normalize(sections: dict[str, dict[str, str]]) -> dict:
         "l2_cache": rc.get("L2 Cache"),
         "pixel_rate_gpixels": _f(th.get("Pixel Rate")),
         "texture_rate_gtexels": _f(th.get("Texture Rate")),
-        "theoretical_fp16_tflops": _f(th.get("FP16")),
-        "theoretical_fp32_tflops": _f(th.get("FP32")),
-        "theoretical_fp64_gflops": _f(th.get("FP64")),
+        "theoretical_fp16_tflops": _tflops(th.get("FP16")),
+        "theoretical_fp32_tflops": _tflops(th.get("FP32")),
+        "theoretical_fp64_gflops": _gflops(th.get("FP64")),
         "matrix_int4_tops": _f((mx.get("INT4") or "")),
         "matrix_int8_tops": _f((mx.get("INT8") or "")),
+        "matrix_fp4_tflops": _f((mx.get("FP4") or "")),
+        "matrix_fp6_tflops": _f((mx.get("FP6") or "")),
         "matrix_fp8_tflops": _f((mx.get("FP8") or "")),
         "matrix_fp16_tflops": _f((mx.get("FP16") or "")),
         "matrix_bf16_tflops": _f((mx.get("BF16") or "")),

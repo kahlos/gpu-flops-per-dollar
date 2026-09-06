@@ -71,6 +71,11 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
     gid = meta["id"]
     cur = tpu_curated.CURATED[gid]
     now = dt.datetime.now(dt.timezone.utc).isoformat()
+    # Variant entries sharing one TPU reference page (e.g. RX 480 4GB on the
+    # 8GB page): entry-defining fields win over the live page. Documented in
+    # config.py per entry; keeps variant memory/MSRP honest.
+    if live is not None and meta.get("tpu_overrides"):
+        live = {**live, **meta["tpu_overrides"]}
 
     def LV(k, default=None):
         v = live.get(k) if live else None
@@ -114,26 +119,29 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
             if not _ok:
                 discrepancies.append(f"{_lk}: live={_lv!r} curated={_cv!r}")
 
+    def _I(v):
+        return None if v is None else int(v)
+
     specs = {
         "die": LV("die", cur["die"]), "architecture": LV("architecture", cur["architecture"]),
-        "process_nm": int(LV("process_nm", cur["process_nm"])),
-        "transistors_m": int(round(LV("transistors_b", cur["transistors_b"]) * 1000)),
-        "die_size_mm2": int(LV("die_size_mm2", cur["die_size_mm2"])),
-        "sm": int(LV("sm_count", cur["sm"])), "cuda": int(LV("cuda_cores", cur["cuda"])),
-        "tensor": int(LV("tensor_cores", cur["tensor_cores"])),
-        "rt": int(LV("rt_cores", cur["rt_cores"])),
-        "tmu": int(LV("tmu", cur["tmu"])), "rop": int(LV("rop", cur["rop"])),
-        "base_mhz": int(LV("base_clock_mhz", cur["base_mhz"])),
-        "boost_mhz": int(LV("boost_clock_mhz", cur["boost_mhz"])),
-        "mem_gbps": float(LV("memory_clock_effective_gbps", cur["mem_mhz_effective_gbps"])),
-        "vram_gb": int(LV("memory_size_gb", cur["memory_gb"])),
-        "mem_type": LV("memory_type", cur["memory_type"]),
-        "mem_bus": int(LV("memory_bus_bits", cur["bus_bits"])),
-        "bw": float(LV("memory_bandwidth_gbs", cur["bandwidth_gbs"])),
-        "tdp_w": int(LV("tdp_w", cur["tdp_w"])), "psu_w": int(LV("suggested_psu_w", cur["psu_w"])),
-        "power": LV("power_connectors", cur["power_connector"]),
-        "bus_if": LV("bus_interface", cur["bus_interface"]),
-        "msrp_usd": int(LV("launch_price_usd", cur["msrp_usd"])),
+        "process_nm": _I(LV("process_nm", cur["process_nm"])),
+        "transistors_m": _I(round(LV("transistors_b", cur["transistors_b"]) * 1000)) if LV("transistors_b", cur.get("transistors_b")) is not None else None,
+        "die_size_mm2": _I(LV("die_size_mm2", cur["die_size_mm2"])),
+        "sm": _I(LV("sm_count", cur.get("sm"))), "cuda": _I(LV("cuda_cores", cur.get("cuda"))),
+        "tensor": _I(LV("tensor_cores", cur.get("tensor_cores"))),
+        "rt": _I(LV("rt_cores", cur.get("rt_cores"))),
+        "tmu": _I(LV("tmu", cur.get("tmu"))), "rop": _I(LV("rop", cur.get("rop"))),
+        "base_mhz": _I(LV("base_clock_mhz", cur.get("base_mhz"))),
+        "boost_mhz": _I(LV("boost_clock_mhz", cur.get("boost_mhz"))),
+        "mem_gbps": (lambda v: float(v) if v is not None else None)(LV("memory_clock_effective_gbps", cur.get("mem_mhz_effective_gbps"))),
+        "vram_gb": (lambda v: None if v is None else int(round(v)))(LV("memory_size_gb", cur.get("memory_gb"))),
+        "mem_type": LV("memory_type", cur.get("memory_type")),
+        "mem_bus": _I(LV("memory_bus_bits", cur.get("bus_bits"))),
+        "bw": (lambda v: float(v) if v is not None else None)(LV("memory_bandwidth_gbs", cur.get("bandwidth_gbs"))),
+        "tdp_w": _I(LV("tdp_w", cur.get("tdp_w"))), "psu_w": _I(LV("suggested_psu_w", cur.get("psu_w"))),
+        "power": LV("power_connectors", cur.get("power_connector")),
+        "bus_if": LV("bus_interface", cur.get("bus_interface")),
+        "msrp_usd": _I(LV("launch_price_usd", cur.get("msrp_usd"))),
         "chip": (live.get("chip") if live else None) or cur["die"].split("-")[0],
         "foundry": LV("foundry"), "process_detail": LV("process"),
         "l2": LV("l2_cache"), "outputs": LV("outputs"), "slot": LV("slot_width"),
@@ -155,14 +163,14 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
     if specs["density"] is None and specs["transistors_m"] and specs["die_size_mm2"]:
         specs["density"] = round(specs["transistors_m"] / specs["die_size_mm2"], 1)
 
-    theo = {"f32": float(LV("theoretical_fp32_tflops", cur["fp32_tflops"])),
-            "f16": float(LV("theoretical_fp16_tflops", cur["fp16_theoretical_tflops"])),
-            "f64": float(LV("theoretical_fp64_gflops", cur["fp64_gflops"])),
-            "px": float((live.get("pixel_rate_gpixels") if live else None) or 0) or None,
-            "tx": float((live.get("texture_rate_gtexels") if live else None) or 0) or None}
     def _F(live_key, cur_key):
         v = LV(live_key, cur.get(cur_key))
         return float(v) if v is not None else None
+    theo = {"f32": _F("theoretical_fp32_tflops", "fp32_tflops"),
+            "f16": _F("theoretical_fp16_tflops", "fp16_theoretical_tflops"),
+            "f64": _F("theoretical_fp64_gflops", "fp64_gflops"),
+            "px": float((live.get("pixel_rate_gpixels") if live else None) or 0) or None,
+            "tx": float((live.get("texture_rate_gtexels") if live else None) or 0) or None}
     mx = {"fp4": _F("matrix_fp4_tflops", "matrix_fp4_dense"),
           "fp8": _F("matrix_fp8_tflops", "matrix_fp8_dense"),
           "i4": _F("matrix_int4_tops", "matrix_int4_dense"),
@@ -170,9 +178,12 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
           "f16": _F("matrix_fp16_tflops", "matrix_fp16_dense"),
           "bf": _F("matrix_bf16_tflops", "matrix_bf16_dense"),
           "tf": _F("matrix_tf32_tflops", "matrix_tf32_dense"),
-          # Structured sparsity is Ampere+. Turing pages list no sparse note.
+          # Structured sparsity (2:4) exists on NVIDIA Ampere and newer
+          # (Ampere/Ada/Hopper/Blackwell) plus RDNA4; older pages list no
+          # sparse note. Curated fallback assumes sparsity only for known
+          # sparse-capable architectures, never by default.
           "sparse_mult": 2.0 if (live and live.get("sparse_note")) or
-          (not live and cur["architecture"] not in ("Turing",)) else 1.0}
+          (not live and cur.get("architecture") in ("Ampere", "Ada Lovelace", "Hopper", "Blackwell", "Blackwell 2.0")) else 1.0}
     def cond_block(d: dict | None):
         if not d:
             return None
@@ -181,10 +192,15 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
                 "windows": d["windows"], "monthly": d["monthly"],
                 "stats": d["stats"], "product_meta": d["summary"].get("product", {})}
 
-    # Precision selection (METHODOLOGY.md): dense max(FP4, INT4). Ampere/Turing
-    # have no FP4 so INT4 wins; Blackwell+ has FP4 and no INT4. Tensor-less
-    # cards (no Matrix block) fall back to the highest Theoretical number.
-    _cands = {"FP4 dense": mx["fp4"], "INT4 dense": mx["i4"]}
+    # Precision selection (METHODOLOGY.md): dense max over available tensor
+    # precisions (FP4 > INT4 > INT8/FP8 > FP16/BF16 > TF32 in practice; the
+    # winner is recorded). Volta (V100) has FP16-only tensor hardware, so a
+    # fixed FP4/INT4 lookup would miss it. Tensor-less cards (no Matrix
+    # block) fall back to the highest Theoretical number.
+    _cands = {"FP4 dense": mx["fp4"], "INT4 dense": mx["i4"],
+              "INT8 dense": mx["i8"], "FP8 dense": mx["fp8"],
+              "FP16 dense": mx["f16"], "BF16 dense": mx["bf"],
+              "TF32 dense": mx["tf"]}
     _avail = {k: v for k, v in _cands.items() if v is not None}
     if _avail:
         ai_prec, ai_t = max(_avail.items(), key=lambda kv: kv[1])
@@ -197,6 +213,8 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
             ai_prec, ai_t = max(_theo_avail.items(), key=lambda kv: kv[1])
         else:
             ai_prec, ai_t = "missing", None
+        # No structured sparsity without tensor hardware: fallback is dense-only.
+        mx["sparse_mult"] = 1.0
     used_block = cond_block(shs.get("used"))
     new_block = cond_block(shs.get("new"))
     price_u = (used_block or {}).get("canon")
@@ -215,7 +233,11 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
     tpu_slug = None
     if meta.get("tpu_url"):
         tpu_slug = meta["tpu_url"].rstrip("/").split("/")[-1].split(".")[0]
-    disp = meta["name"].replace("NVIDIA ", "", 1)
+    disp = meta["name"]
+    for _pfx in ("NVIDIA ", "AMD ", "Intel "):
+        if disp.startswith(_pfx):
+            disp = disp[len(_pfx):]
+            break
     # TPU table naming is inconsistent ("SUPER" caps, "12 GB" spaced, plain
     # "RTX 3080" for the 10GB card); explicit aliases live in config.py.
     # Cards absent from the table (3090 Ti, 3080 12GB, 3060/2060 8/12GB
@@ -340,11 +362,11 @@ def main() -> None:
                       for g in _gens)
     _cov = _cov or "Discrete GPUs"
     summary = {
-        "title": f"AI Compute (FP4/INT4 dense) per Dollar — {_cov}",
+        "title": f"AI Compute (dense) per Dollar — {_cov}",
         "coverage": _cov,
-        "methodology": ("AI TFLOPS = dense max(FP4, INT4) from TechPowerUp Matrix Performance "
+        "methodology": ("AI TFLOPS = dense max over available tensor precisions from TechPowerUp Matrix Performance "
                         "(gaming rel-perf, sparsity + full tensor precisions alongside); Ampere "
-                        "has no FP4 so INT4 dense is used. Where Matrix numbers are absent, the "
+                        "has no FP4 so INT4 dense wins, Blackwell FP4 wins, Volta FP16 wins. Where Matrix numbers are absent, the "
                         "highest Theoretical number is used. Price = SecondHandSilicon "
                         "trailing-30-day mean of used eBay sold listings (new tracked too); "
                         f"samples below {MIN_30D_SAMPLES} listings are flagged 'thin'. "
@@ -371,6 +393,15 @@ def main() -> None:
     print(f"\ncommitted {run_ts} to {args.db or DB_PATH} "
           f"({len(records)} gpus, history +{res['history_added']})")
     print("view live: ./serve  ->  http://localhost:8000/website/")
+    # Loud failure: GPUs with no used-pricing block render unranked. The DB
+    # keeps previous rows (never wiped), but the operator must know to retry.
+    _missing = sorted(r["id"] for r in records if not (r["pricing"] or {}).get("used"))
+    if _missing:
+        print("\nWARNING: used price fetch failed for: " + ", ".join(_missing))
+        print("  previous pricing (if any) was kept; retry with:")
+        print(f"  .venv/bin/python -m scraper.run --only {','.join(_missing)}"
+              + (f" --db {args.db}" if args.db else ""))
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
