@@ -74,6 +74,40 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
         v = live.get(k) if live else None
         return default if v is None else v
 
+    # Live-vs-curated verification: every live value is diffed against the
+    # baseline; mismatches are stored (and printed) for human review.
+    discrepancies: list[str] = []
+    if live is not None:
+        _CHECK = [
+            ("die", "die"), ("architecture", "architecture"), ("process_nm", "process_nm"),
+            ("transistors_b", "transistors_b"), ("die_size_mm2", "die_size_mm2"),
+            ("sm_count", "sm"), ("cuda_cores", "cuda"), ("tensor_cores", "tensor_cores"),
+            ("rt_cores", "rt_cores"), ("tmu", "tmu"), ("rop", "rop"),
+            ("base_clock_mhz", "base_mhz"), ("boost_clock_mhz", "boost_mhz"),
+            ("memory_clock_effective_gbps", "mem_mhz_effective_gbps"),
+            ("memory_size_gb", "memory_gb"), ("memory_type", "memory_type"),
+            ("memory_bus_bits", "bus_bits"), ("memory_bandwidth_gbs", "bandwidth_gbs"),
+            ("tdp_w", "tdp_w"), ("suggested_psu_w", "psu_w"),
+            ("power_connectors", "power_connector"), ("bus_interface", "bus_interface"),
+            ("launch_price_usd", "msrp_usd"),
+            ("theoretical_fp32_tflops", "fp32_tflops"),
+            ("theoretical_fp16_tflops", "fp16_theoretical_tflops"),
+            ("theoretical_fp64_gflops", "fp64_gflops"),
+            ("matrix_fp16_tflops", "matrix_fp16_dense"),
+            ("matrix_int8_tops", "matrix_int8_dense"),
+            ("matrix_int4_tops", "matrix_int4_dense"),
+        ]
+        for _lk, _ck in _CHECK:
+            _lv, _cv = live.get(_lk), cur.get(_ck)
+            if _lv is None:
+                continue
+            if isinstance(_lv, float) and isinstance(_cv, (int, float)):
+                _ok = abs(_lv - _cv) <= max(0.02 * abs(_cv), 0.35)
+            else:
+                _ok = str(_lv) == str(_cv)
+            if not _ok:
+                discrepancies.append(f"{_lk}: live={_lv!r} curated={_cv!r}")
+
     specs = {
         "die": LV("die", cur["die"]), "architecture": LV("architecture", cur["architecture"]),
         "process_nm": int(LV("process_nm", cur["process_nm"])),
@@ -178,7 +212,7 @@ def build_expanded(meta: dict, shs: dict, live, method: str, rel_names: set[str]
         "depreciation": {"dep_bps": dep, "ret_bps": ret},
         "status": {"tpu": status_tpu, "pu": flag(n30u), "pn": flag(n30n)},
         "relperf_name": rel_name,
-        "discrepancies": [],
+        "discrepancies": discrepancies,
         "collected_at": now,
         "_raw_shs": shs,  # listings carrier for the DB builder; stripped before store
     }
@@ -254,6 +288,8 @@ def main() -> None:
         print(f"  staged. AI={rec['ai']['t']} T, used30d=${u.get('canon')} "
               f"(n={u.get('windows', {}).get('30d', {}).get('n')}, flag={rec['status']['pu']}), "
               f"new30d={(rec['pricing']['new'] or {}).get('canon')}, {rec['ai']['pd']} T/$")
+        for _d in rec["discrepancies"]:
+            print(f"    DIFF vs curated: {_d}")
 
     records.sort(key=lambda r: (r["ai"]["pd"] or 0), reverse=True)
     import json as _json
