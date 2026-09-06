@@ -20,11 +20,16 @@ frozen table when the database is right there).
 gpu.db          THE database (SQLite + zstd-22, ~1 MB for 19 GPUs)
 serve           one-command launcher: site + JSON API from gpu.db
 docs/           README.md (this index), METHODOLOGY.md, PIPELINE.md,
-                SCHEMA.md (table reference), API.md, ROADMAP.md
+                SCHEMA.md (table reference), API.md, ROADMAP.md,
+                CLUSTER-VIABILITY-ANALYSIS.md (cluster economics vs API),
+                INT4-VIABILITY-RESEARCH.MD, TOKEN-ECONOMICS-RESEARCH.md,
+                Legacy-AI-Hardware-TCO-Analysis.md (earlier research; see the
+                viability report's reconciliation section before using)
 scraper/        crawl code: config, TPU parsers, SHS client, curated baseline, run.py
 dbtools/        database code: schema.sql, store, query, delta, pack, maint
 website/        static site, live-only (reads /api/bundle from gpu.db)
-tools/          fetch_tpu_live.sh (headed-Chromium dumps), serve.py (server impl)
+tools/          fetch_tpu_live.sh (headed-Chromium dumps), serve.py (server impl),
+                cluster_model.py (self-checking cluster economics model)
 requirements.txt
 ```
 
@@ -57,6 +62,11 @@ query.get_listings(con, 'rtx-3090', 'used')['rows']  # [[date, price, title]]
 - `SCHEMA.md` — table/column reference and storage format.
 - `API.md` — live endpoint reference with curl/Python examples.
 - `ROADMAP.md` — must-dos (FP4 selection before Blackwell!), scale-up plan, open ideas.
+- `CLUSTER-VIABILITY-ANALYSIS.md` — can a used-GPU cluster undercut DeepSeek
+  V4 Flash API pricing? Verdict + triple-checked model; reproducible via
+  `tools/cluster_model.py` (the .py is the authority). The two TOKEN-ECONOMICS/
+  TCO research docs are superseded on economics (unit-slip bugs) — read the
+  reconciliation section first.
 
 ## Sources
 
