@@ -1,0 +1,64 @@
+# GPU FLOPS per Dollar
+
+**Aim:** rank AI accelerators by expected low-precision tensor throughput per
+used dollar — dense `max(FP4, INT4)` from TechPowerUp, divided by the
+trailing-30-day used price from SecondHandSilicon (eBay sold listings) — plus
+the memory, bandwidth, power and interface context needed to judge real
+deployability. Full rules: `docs/METHODOLOGY.md`.
+
+**Status:** 19 GPUs (RTX 20 + 30) in `gpu.db`. Leader at last crawl: RTX 2080
+Super, 1.62 TFLOPS/$ (live values: `./serve`, then `/api/gpus`, or
+`SELECT short_name, ai_pd/10000.0 FROM gpus ORDER BY ai_pd DESC` — never trust a
+frozen table when the database is right there).
+
+## Layout (database + docs + code, nothing else)
+
+```
+gpu.db          THE database (SQLite + zstd-22, ~1 MB for 19 GPUs)
+serve           one-command launcher: site + JSON API from gpu.db
+docs/           README.md (this index), METHODOLOGY.md, PIPELINE.md,
+                SCHEMA.md (table reference), API.md, ROADMAP.md
+scraper/        crawl code: config, TPU parsers, SHS client, curated baseline, run.py
+dbtools/        database code: schema.sql, store, query, delta, pack, maint
+website/        static site, live-only (reads /api/bundle from gpu.db)
+tools/          fetch_tpu_live.sh (headed-Chromium dumps), serve.py (server impl)
+requirements.txt
+```
+
+## Usage
+
+```bash
+./serve [port] [--open]   # site at /website/, JSON API at /api/ (docs/API.md)
+.venv/bin/python -m scraper.run                  # pricing refresh; specs reused from DB
+.venv/bin/python -m scraper.run --only rtx-3090  # pricing subset (summary stays full-DB)
+.venv/bin/python -m scraper.run --tpu-live-dir /tmp/tpu_live  # + fresh TPU dumps
+.venv/bin/python -m scraper.run --refresh-specs all --tpu-live-dir /tmp/tpu_live
+```
+
+Analyze from Python (transparent decompression, friendly units):
+
+```python
+import sys; sys.path.insert(0, '.')
+from pathlib import Path
+from dbtools import query
+con = query.open_ro(Path('gpu.db'))
+query.leaderboard(con)                  # ranked TFLOPS/$ rows
+query.get_gpu_full(con, 'rtx-3090')     # full record
+query.get_listings(con, 'rtx-3090', 'used')['rows']  # [[date, price, title]]
+```
+
+## Docs for future agents
+
+- `METHODOLOGY.md` — metric definition, locked decisions, provenance + coverage rules, limitations.
+- `PIPELINE.md` — crawl anatomy, TPU firewall, run flags, new-GPU checklist, troubleshooting, scheduling.
+- `SCHEMA.md` — table/column reference and storage format.
+- `API.md` — live endpoint reference with curl/Python examples.
+- `ROADMAP.md` — must-dos (FP4 selection before Blackwell!), scale-up plan, open ideas.
+
+## Sources
+
+- Specs/perf: <https://www.techpowerup.com/gpu-specs> — fetched with headed
+  Chromium (`playwright-cli`; plain HTTP gets a PoW challenge, headless gets a
+  hard 403 — see `docs/PIPELINE.md`). Raw pages archived hash-verified in the DB.
+- Prices: <https://secondhandsilicon.com/> — public JSON API over plain HTTPS
+  (`/api/prices/{slug}` + `/api/export/{slug}`), used and new conditions.
