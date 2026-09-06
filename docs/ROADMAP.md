@@ -56,8 +56,12 @@ Prioritized future work. Status context: ~150 GPUs (GeForce GTX 400 → RTX
 
 ## Product (site + API)
 
+- **Done (2026-09): per-precision explorer** on the site — FP4/INT4/FP8/INT8/
+  FP16/BF16/TF32/FP32 rankings that never mix precisions, filters, scatter +
+  pareto view (website/app.js). The legacy dense `aimax` ranking remains as a
+  continuity fallback only.
 - **Price-history charts** on the site from `monthly` + `/api/.../prices`
-  (data exists; only dense leaderboard exists today).
+  (data exists; charts not built yet).
 - **CSV export endpoint** (`/api/gpus?format=csv`) for spreadsheet agents.
 - **Filtering/sorting on `/api/gpus`** (by arch, VRAM, price band).
 - **Currency/region support** if scope leaves eBay-US.
@@ -67,9 +71,13 @@ Prioritized future work. Status context: ~150 GPUs (GeForce GTX 400 → RTX
 
 - **pytest suite** (currently verification is manual scripts): pack round-trip,
   delta round-trip + chain resolution, API smoke, summary-full-DB invariant.
-- **Git + backup policy:** no repo exists yet; `gpu.db` is THE database — decide
-  backup cadence before it grows (single file ⇒ trivially copyable; never
-  copy it mid-write — checkpoint first or copy with SQLite backup API).
+  Note `tools/cluster_model.py` already follows the self-checking pattern
+  (calibration + floor asserts on every run).
+- **Git + backup policy:** repo exists and pushes to GitHub
+  (kahlos/gpu-flops-per-dollar); `gpu.db` is THE database and stays gitignored
+  by design — still decide a backup cadence before it grows (single file ⇒
+  trivially copyable; never copy it mid-write — checkpoint first or copy with
+  SQLite backup API).
 - **Serve hardening:** request logging exists; add `--bind` deliberately (never
   default to `0.0.0.0`), consider read-only filesystem posture.
 - **Playwright pinning:** `playwright-cli` binary + headed-Chromium behavior is

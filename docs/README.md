@@ -17,7 +17,7 @@ frozen table when the database is right there).
 ## Layout (database + docs + code, nothing else)
 
 ```
-gpu.db          THE database (SQLite + zstd-22, ~1 MB for 19 GPUs)
+gpu.db          THE database (SQLite + zstd-22, ~6 MB for 157 GPUs)
 serve           one-command launcher: site + JSON API from gpu.db
 docs/           README.md (this index), METHODOLOGY.md, PIPELINE.md,
                 SCHEMA.md (table reference), API.md, ROADMAP.md,
@@ -39,6 +39,7 @@ requirements.txt
 .venv/bin/python -m scraper.run --only rtx-3090  # pricing subset (summary stays full-DB)
 .venv/bin/python -m scraper.run --tpu-live-dir /tmp/tpu_live  # + fresh TPU dumps
 .venv/bin/python -m scraper.run --refresh-specs all --tpu-live-dir /tmp/tpu_live
+.venv/bin/python tools/cluster_model.py          # cluster economics model (docs/CLUSTER-VIABILITY-ANALYSIS.md)
 ```
 
 Analyze from Python (transparent decompression, friendly units):
