@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Live server: site + JSON API, straight from gpu.db. Usage: ./serve [port] [--open]
+# Bootstraps .venv on first run. No build step — the page reads the database.
+set -u
+cd "$(dirname "$0")"
+if [ ! -x .venv/bin/python ]; then
+  echo "creating .venv and installing requirements (one-time)..."
+  python3 -m venv .venv || exit 1
+  .venv/bin/pip install -q -r requirements.txt || exit 1
+fi
+exec .venv/bin/python tools/serve.py "$@"
